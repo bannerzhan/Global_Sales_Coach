@@ -44,5 +44,11 @@ next-env.d.ts
 # machine-specific npm config (cache path workaround on this dev machine)
 .npmrc
 
-# local trash / broken module dir (renamed leftover, safe to delete)
-.trash_node_modules_broken
+# local trash / renamed leftovers (safe to delete)
+.trash_*
+
+# local build log captures (debug leftovers)
+b*_out.txt
+b*_err.txt
+build_out.txt
+build_err.txt
