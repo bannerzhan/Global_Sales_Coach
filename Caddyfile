@@ -1,0 +1,18 @@
+{
+	# 部署前把 YOUR_DOMAIN 换成真实域名（deploy.sh 会自动替换）
+	{$GSC_DOMAIN} {
+		encode gzip
+
+		@pwa {
+			path /manifest.webmanifest /sw.js /icons/*
+		}
+		header @pwa Cache-Control "public, max-age=0, must-revalidate"
+
+		header {
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "strict-origin-when-cross-origin"
+		}
+
+		reverse_proxy app:3000
+	}

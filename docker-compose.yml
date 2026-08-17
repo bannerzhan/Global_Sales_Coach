@@ -1,0 +1,59 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: gsc-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gsc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gsc_dev_password}
+      POSTGRES_DB: gsc
+    ports:
+      - "127.0.0.1:5433:5432" # 仅本机可访问；服务器上由 docker 内网通信
+    volumes:
+      - gsc_pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gsc -d gsc"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    container_name: gsc-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://gsc:${POSTGRES_PASSWORD:-gsc_dev_password}@db:5432/gsc
+      ARK_API_KEY: ${ARK_API_KEY:?请在 .env 中设置 ARK_API_KEY}
+      ARK_BASE_URL: ${ARK_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}
+      ARK_ENDPOINT_PRO: ${ARK_ENDPOINT_PRO:?请在 .env 中设置 ARK_ENDPOINT_PRO}
+      ARK_ENDPOINT_TURBO: ${ARK_ENDPOINT_TURBO:?请在 .env 中设置 ARK_ENDPOINT_TURBO}
+      AUTH_SECRET: ${AUTH_SECRET:?请在 .env 中设置 AUTH_SECRET}
+      AUTH_USER_EMAIL: ${AUTH_USER_EMAIL:?请在 .env 中设置 AUTH_USER_EMAIL}
+      AUTH_USER_PASSWORD_HASH: ${AUTH_USER_PASSWORD_HASH:?请在 .env 中设置 AUTH_USER_PASSWORD_HASH}
+    expose:
+      - "3000"
+
+  # Caddy: 自动 HTTPS (Let's Encrypt)，PWA 安装必需
+  caddy:
+    image: caddy:2-alpine
+    container_name: gsc-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - gsc_caddy_data:/data
+      - gsc_caddy_config:/config
+
+volumes:
+  gsc_pgdata:
+  gsc_caddy_data:
+  gsc_caddy_config:
