@@ -40,15 +40,27 @@ export function ChatView({
     if (!text || sending || !active) return;
     setInput("");
     setError(null);
+
+    // 乐观更新：立刻把用户自己的气泡显示出来（不等服务器往返）
+    const optimisticTurn: RoleplayTurn = {
+      role: "user",
+      content: text,
+      pressureStep: 0,
+      createdAt: new Date().toISOString(),
+    };
+    setTurns((t) => [...t, optimisticTurn]);
     setSending(true);
 
     startTransition(async () => {
       const res = await sendMessage(sessionId, text);
-      if (res.ok && res.userTurn && res.aiTurn) {
-        setTurns((t) => [...t, res.userTurn!, res.aiTurn!]);
+      if (res.ok && res.aiTurn) {
+        // 只追加 AI 客户回复（用户气泡已乐观显示，避免重复）
+        setTurns((t) => [...t, res.aiTurn!]);
       } else {
+        // 回滚乐观插入的用户气泡，并恢复输入框
+        setTurns((t) => t.filter((x) => x !== optimisticTurn));
+        setInput(text);
         setError(res.error ?? "发送失败，请重试");
-        setInput(text); // 失败恢复输入
       }
       setSending(false);
     });
