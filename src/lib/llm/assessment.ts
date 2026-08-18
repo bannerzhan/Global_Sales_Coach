@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { runContract } from "./contract";
+import { langOf, outputLangLine } from "./lang";
 import type { Profile } from "../repo/types";
 import { DIMENSION_LABEL } from "../repo/skills";
 
@@ -43,6 +44,8 @@ export interface AssessmentInput {
   selfRatings: Record<AssessmentDimension, number>; // 1-5 用户自评
   context?: string; // 选填：一段真实外贸沟通经历
   userId?: string | null;
+  /** 演练语言："zh-CN" | "en" */
+  locale?: string | null;
 }
 
 const POLICY = `【行为准则（固定，不可改）】
@@ -55,9 +58,11 @@ export async function runAssessment(input: AssessmentInput): Promise<{
   data?: AssessmentOutput;
   degraded?: boolean;
 }> {
+  const lang = langOf(input.locale);
   const selfLines = ASSESSMENT_DIMENSIONS.map(
     (d) => `- ${ASSESSMENT_DIM_LABEL[d]}（${d}）自评：${input.selfRatings[d]}/5`,
   ).join("\n");
+  const fb = (zh: string, en: string) => (lang === "en" ? en : zh);
 
   const profileLine = input.profile
     ? `用户画像：${input.profile.occupation ?? "未填"} · ${input.profile.industry ?? "未填行业"} · 目标市场 ${
@@ -87,9 +92,12 @@ export async function runAssessment(input: AssessmentInput): Promise<{
       dimensionScores: ASSESSMENT_DIMENSIONS.map((d) => ({
         dimension: d,
         score: Math.round((input.selfRatings[d] / 5) * 10),
-        summary: "基于你的自评生成的初步基线",
+        summary: fb("基于你的自评生成的初步基线", "Preliminary baseline derived from your self-rating"),
       })),
-      overallSummary: "已完成初步基线评估，建议多完成几场演练以校准能力画像。",
+      overallSummary: fb(
+        "已完成初步基线评估，建议多完成几场演练以校准能力画像。",
+        "Preliminary baseline set. Complete more drills to calibrate your ability profile.",
+      ),
     }),
     system:
       "你是 Global Sales Coach 的基线评估教练，为一位中国外贸销售做能力基线测评。\n" +
@@ -99,7 +107,7 @@ export async function runAssessment(input: AssessmentInput): Promise<{
       "维度（必须全部给出）：\n" +
       ASSESSMENT_DIMENSIONS.map((d) => `- ${d}（${ASSESSMENT_DIM_LABEL[d]}）`).join("\n") +
       "\n" +
-      "评分要基于真实能力信号（自评 + 画像 + 经历），不要无依据给高分。全部用中文输出。",
+      "评分要基于真实能力信号（自评 + 画像 + 经历），不要无依据给高分。" + outputLangLine(lang),
   },
   [
     {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { runContract } from "./contract";
+import { langOf, outputLangLine } from "./lang";
 import type { ReviewResult, RoleplayTurn } from "../repo/types";
 import { SKILLS } from "../repo/skills";
 
@@ -56,6 +57,11 @@ const DIM_LABEL: Record<(typeof DIMENSIONS)[number], string> = {
   deal_advancement: "推进成交",
   trust_building: "信任建立",
 };
+const DIM_LABEL_EN: Record<(typeof DIMENSIONS)[number], string> = {
+  communication: "Communication",
+  deal_advancement: "Deal Advancement",
+  trust_building: "Trust Building",
+};
 
 export interface ReviewInput {
   scenarioTitle: string;
@@ -64,6 +70,8 @@ export interface ReviewInput {
   turns: RoleplayTurn[];
   userId?: string | null;
   sessionId?: string | null;
+  /** 演练语言："zh-CN" | "en" */
+  locale?: string | null;
 }
 
 export async function reviewSession(input: ReviewInput): Promise<{
@@ -71,11 +79,20 @@ export async function reviewSession(input: ReviewInput): Promise<{
   data?: ReviewOutput;
   degraded?: boolean;
 }> {
+  const lang = langOf(input.locale);
   const dialogue = input.turns
-    .map((t, i) => `${t.role === "user" ? "【销售】" : "【客户】"}(${i}): ${t.content}`)
+    .map(
+      (t, i) =>
+        `${t.role === "user" ? (lang === "en" ? "[Sales]" : "【销售】") : lang === "en" ? "[Buyer]" : "【客户】"}(${i}): ${t.content}`,
+    )
     .join("\n");
 
   const skillPool = SKILLS.map((s) => `${s.id}（${s.name}）`).join("、");
+  const dimList = DIMENSIONS.map((d) =>
+    lang === "en" ? `${d} (${DIM_LABEL_EN[d]})` : `${d}（${DIM_LABEL[d]}）`,
+  ).join("、");
+
+  const fb = (zh: string, en: string) => (lang === "en" ? en : zh);
 
   const result = await runContract<ReviewOutput>(
     {
@@ -93,16 +110,22 @@ export async function reviewSession(input: ReviewInput): Promise<{
         dimensionScores: DIMENSIONS.map((d) => ({
           dimension: d,
           score: 5,
-          comment: "本次演练覆盖有限，建议继续练习",
+          comment: fb("本次演练覆盖有限，建议继续练习", "Limited coverage this round; keep practicing"),
         })),
-        highlights: ["完成了演练"],
-        improvements: ["需求挖掘不够深入", "建议多做一轮练习"],
-        feedbackLanguage: ["注意用更具体的提问替代泛泛而谈", "可多用开放式问题探需求"],
+        highlights: [fb("完成了演练", "Completed the roleplay")],
+        improvements: [
+          fb("需求挖掘不够深入", "Dig deeper into customer needs"),
+          fb("建议多做一轮练习", "Do another practice round"),
+        ],
+        feedbackLanguage: [
+          fb("注意用更具体的提问替代泛泛而谈", "Use more specific questions instead of vague ones"),
+          fb("可多用开放式问题探需求", "Use more open-ended questions to uncover needs"),
+        ],
         feedbackBusiness: [],
         skillUpdates: input.objectives.slice(0, 2).map((sid) => ({
           skillId: sid,
           delta: 0.05,
-          note: "完成演练，小幅进步",
+          note: fb("完成演练，小幅进步", "Finished the drill, slight progress"),
         })),
         turnFeedback: [],
       }),
@@ -114,7 +137,7 @@ export async function reviewSession(input: ReviewInput): Promise<{
         "输出要求：\n" +
         "1. score 是 0-10 的总分，反映整体销售表现\n" +
         "2. dimensionScores 固定评 3 个维度：" +
-        DIMENSIONS.map((d) => `${d}（${DIM_LABEL[d]}）`).join("、") + "\n" +
+        dimList + "\n" +
         "3. highlights 给 1-3 条具体亮点（引用对话里的原话更好）\n" +
         "4. improvements 给 1-4 条可执行改进（不是空话，要具体到动作）\n" +
         "5. feedbackLanguage：1-4 条表达/语言层面的改进（句式、用词、提问技巧等）\n" +
@@ -122,7 +145,7 @@ export async function reviewSession(input: ReviewInput): Promise<{
         "7. skillUpdates 从以下技能池选 1-4 个，delta 表示掌握度增减（-0.3~+0.3）：\n" +
         `   ${skillPool}\n` +
         "8. turnFeedback 挑 0-8 个关键轮次给逐轮点评（turnIndex 对应对话序号）\n" +
-        "9. 全部用中文输出",
+        "9. " + outputLangLine(lang),
     },
     [
       {

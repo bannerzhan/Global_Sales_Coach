@@ -24,6 +24,7 @@ function rowToScenario(row: Record<string, unknown>): Scenario {
       : [],
     workContextSeed: (row.work_context_seed as string | null) ?? null,
     openingLine: (row.opening_line as string) ?? "",
+    locale: (row.locale as string) ?? "zh-CN",
     createdAt: new Date((row.created_at as string) ?? Date.now()).toISOString(),
   };
 }
@@ -41,8 +42,8 @@ export async function createScenario(
   if (await isDbAvailable()) {
     const { rows } = await pool.query(
       `INSERT INTO scenarios
-         (id, slug, title, category, difficulty, persona, objectives, pressure_sequence, work_context_seed)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         (id, slug, title, category, difficulty, persona, objectives, pressure_sequence, work_context_seed, locale)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING *`,
       [
         scenario.id,
@@ -54,6 +55,7 @@ export async function createScenario(
         JSON.stringify(scenario.objectives),
         JSON.stringify(scenario.pressureSequence),
         scenario.workContextSeed,
+        scenario.locale,
       ],
     );
     return rowToScenario(rows[0]);

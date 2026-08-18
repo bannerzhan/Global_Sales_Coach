@@ -71,6 +71,7 @@ async function main() {
     pressureSequence: gen.data!.pressureSequence,
     workContextSeed: null,
     openingLine: gen.data!.openingLine,
+    locale: "zh-CN",
   });
   const openingTurn: RoleplayTurn = {
     role: "ai_customer",

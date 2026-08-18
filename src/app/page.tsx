@@ -8,6 +8,7 @@ import { getLatestBaseline } from "@/lib/repo/assessment";
 import { ASSESSMENT_DIM_LABEL } from "@/lib/llm/assessment";
 import { SignOutButton } from "./sign-out-button";
 import { BudgetStatus } from "./budget-status";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 /**
  * 首页（登录后可见，proxy.ts 已拦截未登录请求）。
@@ -38,7 +39,10 @@ export default async function HomePage() {
               Global Sales Coach
             </span>
           </div>
-          <SignOutButton />
+          <div className="flex items-center gap-2">
+            <LanguageToggle locale={profile?.locale ?? "zh-CN"} />
+            <SignOutButton />
+          </div>
         </div>
       </header>
 

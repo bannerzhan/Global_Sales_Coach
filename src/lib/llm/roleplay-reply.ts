@@ -1,5 +1,6 @@
 import { chat } from "./provider";
 import { recordRun, estimateCost, evaluateAlertsAfterRun } from "./accounting";
+import { langOf } from "./lang";
 import type { Persona, RoleplayTurn, Scenario } from "../repo/types";
 
 /**
@@ -14,6 +15,8 @@ export interface ReplyInput {
   latestUserMessage: string;
   userId?: string | null;
   sessionId?: string | null;
+  /** 演练语言："zh-CN" | "en" */
+  locale?: string | null;
 }
 
 const PRESSURE_EVERY_TURNS = 2; // 每 2 轮用户发言推进一次压力
@@ -24,7 +27,8 @@ export async function customerReply(input: ReplyInput): Promise<{
   pressureStep: number;
   error?: string;
 }> {
-  const { scenario, turns, latestUserMessage, userId, sessionId } = input;
+  const { scenario, turns, latestUserMessage, userId, sessionId, locale } = input;
+  const lang = langOf(locale);
 
   // 计算压力步数：用户发言次数（含本次）
   const userTurns = turns.filter((t) => t.role === "user").length + 1;
@@ -55,7 +59,10 @@ export async function customerReply(input: ReplyInput): Promise<{
         {
           role: "system",
           content:
-            `你是 Global Sales Coach 中扮演买家的 AI 客户，正在和销售进行一场英文/中文外贸洽谈演练（对话用中文，可夹带英文商务词汇）。\n` +
+            (lang === "en"
+              ? "You are the AI buyer in Global Sales Coach, roleplaying a real overseas customer during a foreign-trade sales negotiation drill. " +
+                "The conversation is entirely in English (you may use trade terms like FOB / MOQ / L/C).\n"
+              : "你是 Global Sales Coach 中扮演买家的 AI 客户，正在和销售进行一场中文外贸洽谈演练（对话用中文，可夹带英文商务词汇）。\n") +
             `买家画像：\n` +
             `- 角色：${persona.role}\n` +
             `- 国籍：${persona.nationality}\n` +
@@ -63,10 +70,10 @@ export async function customerReply(input: ReplyInput): Promise<{
             (persona.companySize ? `- 公司规模：${persona.companySize}\n` : "") +
             (persona.budget ? `- 预算：${persona.budget}\n` : "") +
             `\n整体剧情：${scenario.title}\n` +
-            `你的风格：像真实买家一样自然，不要长篇大论（1-3 句话），不要替销售说话，` +
-            `不要评价销售的表现，不要主动结束对话。销售表现好时可以稍微缓和，` +
-            `表现差（如乱承诺、催单太急、没问需求就报价）时顺势施加压力。\n` +
-            `压力剧本：${scenario.pressureSequence.join(" → ")}\n\n` +
+            (lang === "en"
+              ? "Your style: act like a real buyer — natural, not verbose (1-3 sentences), never speak for the salesperson, never judge their performance, never end the conversation yourself. If the salesperson does well, ease up a bit; if they do poorly (e.g. over-promising, pushing too hard, quoting before understanding needs), apply pressure naturally.\n"
+              : "你的风格：像真实买家一样自然，不要长篇大论（1-3 句话），不要替销售说话，不要评价销售的表现，不要主动结束对话。销售表现好时可以稍微缓和，表现差（如乱承诺、催单太急、没问需求就报价）时顺势施加压力。\n") +
+            `压力剧本：${scenario.pressureSequence.join(lang === "en" ? " -> " : " → ")}\n\n` +
             pressureNote,
         },
         ...history.map((h) => ({ role: h.role as "user" | "assistant", content: h.content })),

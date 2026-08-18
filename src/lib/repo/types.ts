@@ -79,6 +79,7 @@ export interface Scenario {
   pressureSequence: string[]; // 压力递进
   workContextSeed: string | null;
   openingLine: string; // AI 客户开场白
+  locale: string; // 演练语言："zh-CN" | "en"，创建场景时锁定，复盘/客户跟随
   createdAt: string;
 }
 

@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS scenarios (
   objectives        JSONB NOT NULL DEFAULT '[]',    -- 练习目标（对应 skill ids）
   pressure_sequence JSONB NOT NULL DEFAULT '[]',    -- 压力递进：price push / MOQ / urgency...
   work_context_seed TEXT,                           -- 用户粘贴的真实产品/邮件/RFQ
+  locale            TEXT NOT NULL DEFAULT 'zh-CN',   -- 演练语言："zh-CN" | "en"
   enabled           BOOLEAN NOT NULL DEFAULT TRUE,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );

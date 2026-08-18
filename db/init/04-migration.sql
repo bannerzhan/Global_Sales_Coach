@@ -30,3 +30,6 @@ CREATE TABLE IF NOT EXISTS assessments (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS assessments_user_created_idx ON assessments (user_id, created_at DESC);
+
+-- 演练场景增加语言字段（语言切换开关）
+ALTER TABLE scenarios ADD COLUMN IF NOT EXISTS locale TEXT NOT NULL DEFAULT 'zh-CN';

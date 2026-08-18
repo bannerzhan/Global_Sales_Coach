@@ -37,6 +37,7 @@ export async function suggestGoalsAction(profile: Omit<Profile, "userId" | "upda
   try {
     return await suggestGoals({
       profile: { userId: "local", ...profile, updatedAt: new Date().toISOString() },
+      locale: profile.locale,
     });
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "生成失败" };
@@ -64,6 +65,7 @@ export async function submitOnboarding(input: {
     profile,
     selfRatings: input.selfRatings,
     context: input.context?.trim() || undefined,
+    locale: profile.locale,
   });
   if (assessment.ok && assessment.data) {
     await saveBaseline({
@@ -85,6 +87,7 @@ export async function submitAssessment(input: {
     profile,
     selfRatings: input.selfRatings,
     context: input.context?.trim() || undefined,
+    locale: profile?.locale,
   });
   if (assessment.ok && assessment.data) {
     await saveBaseline({
@@ -94,4 +97,12 @@ export async function submitAssessment(input: {
     });
   }
   redirect("/");
+}
+
+/** 切换演练语言（首页开关用）："zh-CN" | "en" */
+export async function setLocale(locale: string) {
+  const normalized = locale === "en" ? "en" : "zh-CN";
+  const profile = await getProfile();
+  if (!profile) return;
+  await saveProfile({ ...profile, locale: normalized });
 }

@@ -50,7 +50,8 @@ export async function createPractice(focusSkillId?: string | null) {
         timezone: "Asia/Shanghai",
         updatedAt: new Date().toISOString(),
       } as NonNullable<typeof profile>),
-      focusSkillId,
+    focusSkillId,
+    locale: profile?.locale ?? "zh-CN",
   });
 
   if (!gen.ok || !gen.data) {
@@ -66,6 +67,7 @@ export async function createPractice(focusSkillId?: string | null) {
     pressureSequence: gen.data.pressureSequence,
     workContextSeed: null,
     openingLine: gen.data.openingLine,
+    locale: profile?.locale ?? "zh-CN",
   });
 
   const openingTurn: RoleplayTurn = {
@@ -109,6 +111,7 @@ export async function sendMessage(
     turns: updated.turns,
     latestUserMessage: text,
     sessionId,
+    locale: scenario.locale,
   });
 
   if (!reply.ok || !reply.reply) {
@@ -141,6 +144,7 @@ export async function finishPractice(sessionId: string) {
     objectives: scenario?.objectives ?? [],
     turns: completed.turns,
     sessionId,
+    locale: scenario?.locale,
   });
 
   if (review.ok && review.data) {
@@ -174,6 +178,7 @@ export async function retryReview(sessionId: string): Promise<{ ok: boolean; err
     objectives: scenario?.objectives ?? [],
     turns: session.turns,
     sessionId,
+    locale: scenario?.locale,
   });
   if (!review.ok || !review.data) return { ok: false, error: "复盘失败，请重试" };
 
