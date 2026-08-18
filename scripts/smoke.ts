@@ -82,7 +82,8 @@ async function main() {
         taskType: "lesson_plan",
         tier: "turbo",
         system:
-          "你是销售教练。根据用户描述生成一份 15-20 分钟的刻意练习计划，必须通过 emit_lesson_plan 工具输出。",
+          "你是销售教练。根据用户描述生成一份 15-20 分钟的刻意练习计划。\n" +
+          "硬性要求：必须调用 emit_lesson_plan 工具输出完整参数（title/focus/steps），不要输出任何文本回复。",
         toolName: "emit_lesson_plan",
         toolDescription: "输出学习计划结构",
         schema: planSchema,
@@ -98,7 +99,7 @@ async function main() {
             { order: 2, activity: "角色扮演练习", minutes: 10 },
           ],
         }),
-        maxRetries: 1,
+        maxRetries: 2,
       },
       [
         {

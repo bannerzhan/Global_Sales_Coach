@@ -52,3 +52,6 @@ b*_out.txt
 b*_err.txt
 build_out.txt
 build_err.txt
+
+# local JSON fallback storage (used when PostgreSQL is unavailable in dev)
+.local-data/
