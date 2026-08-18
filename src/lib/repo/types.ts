@@ -53,3 +53,73 @@ export const DEFAULT_PROFILE = {
   locale: "zh-CN",
   timezone: "Asia/Shanghai",
 };
+
+// ---------------------------------------------------------------------------
+// 演练闭环（Step 6）
+// ---------------------------------------------------------------------------
+
+/** 买家画像（scenarios.persona） */
+export interface Persona {
+  role: string;
+  nationality: string;
+  temperament: string;
+  companySize?: string;
+  budget?: string;
+}
+
+/** 演练场景 */
+export interface Scenario {
+  id: string;
+  slug: string;
+  title: string;
+  category: string;
+  difficulty: number; // 1-5
+  persona: Persona;
+  objectives: string[]; // 对应 skill ids
+  pressureSequence: string[]; // 压力递进
+  workContextSeed: string | null;
+  openingLine: string; // AI 客户开场白
+  createdAt: string;
+}
+
+/** 角色扮演会话 */
+export interface RoleplaySession {
+  id: string;
+  userId: string;
+  scenarioId: string;
+  status: "active" | "completed" | "aborted";
+  turns: RoleplayTurn[];
+  startedAt: string;
+  endedAt: string | null;
+}
+
+export interface RoleplayTurn {
+  role: "user" | "ai_customer";
+  content: string;
+  pressureStep: number; // 当前压力递进到第几步（从 0 开始）
+  createdAt: string;
+}
+
+/** 演练记录（attempts） */
+export interface Attempt {
+  id: string;
+  userId: string;
+  scenarioId: string | null;
+  taskType: string;
+  userInput: string;
+  evaluation: Record<string, unknown> | null;
+  score: number | null; // 0-10
+  isRetry: boolean;
+  attemptNo: number;
+  createdAt: string;
+}
+
+/** 复盘输出（review 契约链结果） */
+export interface ReviewResult {
+  score: number; // 0-10
+  dimensionScores: { dimension: string; score: number; comment: string }[];
+  highlights: string[];
+  improvements: string[];
+  skillUpdates: { skillId: string; delta: number; note: string }[];
+  turnFeedback: { turnIndex: number; comment: string }[];
+}

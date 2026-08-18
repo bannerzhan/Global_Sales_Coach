@@ -76,22 +76,36 @@ export default async function HomePage() {
         </div>
 
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {[
-            { title: "情景演练", desc: "Step 6 上线", icon: "🎭" },
-            { title: "技能复盘", desc: "Step 6 上线", icon: "📈" },
-            { title: "每日一练", desc: `每天 ${profile?.dailyMinutes ?? 30} 分钟`, icon: "⏱️" },
-          ].map((c) => (
-            <div
-              key={c.title}
-              className="rounded-2xl border border-zinc-200 bg-white p-5 opacity-60 dark:border-zinc-800 dark:bg-zinc-900"
-            >
-              <div className="text-2xl">{c.icon}</div>
-              <h3 className="mt-2.5 font-semibold text-zinc-900 dark:text-zinc-50">
-                {c.title}
-              </h3>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{c.desc}</p>
-            </div>
-          ))}
+          <a
+            href="/practice"
+            className="rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-teal-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-teal-800"
+          >
+            <div className="text-2xl">🎭</div>
+            <h3 className="mt-2.5 font-semibold text-zinc-900 dark:text-zinc-50">
+              情景演练
+            </h3>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              AI 客户角色扮演，练完自动复盘
+            </p>
+          </a>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5 opacity-60 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="text-2xl">📈</div>
+            <h3 className="mt-2.5 font-semibold text-zinc-900 dark:text-zinc-50">
+              技能图谱
+            </h3>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              13 维掌握度，后续版本开放
+            </p>
+          </div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5 opacity-60 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="text-2xl">⏱️</div>
+            <h3 className="mt-2.5 font-semibold text-zinc-900 dark:text-zinc-50">
+              每日一练
+            </h3>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              每天 {profile?.dailyMinutes ?? 30} 分钟，后续版本开放
+            </p>
+          </div>
         </div>
       </section>
     </main>
