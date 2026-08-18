@@ -7,11 +7,20 @@ import { CreatePracticeButton } from "./create-practice-button";
 
 /**
  * 演练入口页：新建演练（基于学习目标生成场景）+ 进行中的演练 + 技能概览。
+ * ?focus=<skillId> 时进入「专项演练」模式，针对某一技能生成场景。
  */
-export default async function PracticePage() {
+export default async function PracticePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ focus?: string | string[] }>;
+}) {
   const goals = await listGoals();
   const active = await listActiveSessions();
   const states = await listSkillStates();
+
+  const rawFocus = (await searchParams).focus;
+  const focusId = Array.isArray(rawFocus) ? rawFocus[0] : rawFocus;
+  const focusDef = focusId ? skillById(focusId) : undefined;
 
   const activeWithScenario = await Promise.all(
     active.map(async (s) => ({ session: s, scenario: await getScenario(s.scenarioId) })),
@@ -39,8 +48,45 @@ export default async function PracticePage() {
       </header>
 
       <section className="mx-auto w-full max-w-3xl flex-1 px-5 py-8">
+        {/* 专项演练（?focus=） */}
+        {focusDef && (
+          <div className="rounded-2xl border border-teal-300 bg-teal-50/70 p-5 dark:border-teal-800 dark:bg-teal-950/30">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-teal-600 px-2 py-0.5 text-xs font-semibold text-white">
+                专项演练
+              </span>
+              <h2 className="font-semibold text-zinc-900 dark:text-zinc-50">
+                {focusDef.name}
+              </h2>
+            </div>
+            <p className="mt-1.5 text-sm text-zinc-600 dark:text-zinc-300">
+              {focusDef.description}
+            </p>
+            <p className="mt-1 text-xs text-teal-700 dark:text-teal-400">
+              AI 客户会重点围绕这一技能施压，集中突破薄弱点。
+            </p>
+            <div className="mt-4">
+              <CreatePracticeButton
+                focusSkillId={focusDef.id}
+                label={`🎯 针对「${focusDef.name}」生成专项演练`}
+              />
+            </div>
+            <a
+              href="/practice"
+              className="mt-3 inline-block text-xs text-zinc-500 hover:underline dark:text-zinc-400"
+            >
+              返回常规演练 →
+            </a>
+          </div>
+        )}
+
         {/* 新建演练 */}
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+        <div
+          className={
+            "rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900" +
+            (focusDef ? " mt-4" : "")
+          }
+        >
           <h2 className="font-semibold text-zinc-900 dark:text-zinc-50">开始一场新演练</h2>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
             {goals[0]

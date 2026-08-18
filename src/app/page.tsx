@@ -101,15 +101,18 @@ export default async function HomePage() {
               13 维掌握度，后续版本开放
             </p>
           </div>
-          <div className="rounded-2xl border border-zinc-200 bg-white p-5 opacity-60 dark:border-zinc-800 dark:bg-zinc-900">
+          <a
+            href="/practice"
+            className="rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-teal-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-teal-800"
+          >
             <div className="text-2xl">⏱️</div>
             <h3 className="mt-2.5 font-semibold text-zinc-900 dark:text-zinc-50">
               每日一练
             </h3>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              每天 {profile?.dailyMinutes ?? 30} 分钟，后续版本开放
+              基于 FSRS 排期，自动推送该练的技能
             </p>
-          </div>
+          </a>
         </div>
 
         <div className="mt-8">
@@ -129,11 +132,13 @@ export default async function HomePage() {
               </p>
               <ul className="mt-2 flex flex-wrap gap-2">
                 {due.map((s) => (
-                  <li
-                    key={s.skillId}
-                    className="rounded-full bg-white px-3 py-1 text-xs font-medium text-teal-700 ring-1 ring-teal-200 dark:bg-zinc-900 dark:text-teal-300 dark:ring-teal-900"
-                  >
-                    {skillById(s.skillId)?.name ?? s.skillId}
+                  <li key={s.skillId}>
+                    <a
+                      href={`/practice?focus=${s.skillId}`}
+                      className="rounded-full bg-white px-3 py-1 text-xs font-medium text-teal-700 ring-1 ring-teal-200 transition hover:ring-teal-400 hover:underline dark:bg-zinc-900 dark:text-teal-300 dark:ring-teal-900"
+                    >
+                      {skillById(s.skillId)?.name ?? s.skillId}
+                    </a>
                   </li>
                 ))}
               </ul>

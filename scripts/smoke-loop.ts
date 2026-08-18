@@ -141,6 +141,19 @@ async function main() {
   check("有复习计划", Boolean(top?.nextReview));
   console.log(`    最高掌握: ${top?.skillId} = ${(top?.mastery ?? 0).toFixed(2)}`);
 
+  console.log("\n[6/6] 专项演练场景生成（focusSkillId）");
+  const focusGen = await generateScenario({
+    goalTitle: "提升外贸销售沟通与成交能力",
+    profile,
+    focusSkillId: "deal_advancement.price_objection",
+  });
+  check("专项场景生成 ok", focusGen.ok === true);
+  check(
+    "objectives 含聚焦技能",
+    focusGen.data?.objectives?.includes("deal_advancement.price_objection") ?? false,
+  );
+  console.log("    专项场景:", focusGen.data?.title, "| objectives:", focusGen.data?.objectives?.join(","));
+
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
   process.exit(fail > 0 ? 1 : 0);
 }

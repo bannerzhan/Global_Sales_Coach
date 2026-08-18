@@ -12,6 +12,7 @@ import {
   createAttempt,
 } from "@/lib/repo/attempt";
 import { applySkillUpdates } from "@/lib/repo/skill-state";
+import { skillById } from "@/lib/repo/skills";
 import { generateScenario } from "@/lib/llm/scenario-gen";
 import { customerReply } from "@/lib/llm/roleplay-reply";
 import { reviewSession } from "@/lib/llm/review";
@@ -23,11 +24,15 @@ import type { RoleplayTurn } from "@/lib/repo/types";
  * 单用户：userId 由 storage 内部解析（LOCAL_USER_ID / email → DB UUID）。
  */
 
-/** 基于当前第一个 active 目标，生成场景并开一场演练 */
-export async function createPractice() {
+/** 基于当前第一个 active 目标（或指定聚焦技能）生成场景并开一场演练 */
+export async function createPractice(focusSkillId?: string | null) {
   const goals = await listGoals();
-  const goalTitle = goals[0]?.title ?? "提升外贸销售沟通与成交能力";
   const profile = await getProfile();
+
+  // 专项演练：目标标题回退为该技能名
+  const focusDef = focusSkillId ? skillById(focusSkillId) : undefined;
+  const goalTitle =
+    goals[0]?.title ?? focusDef?.name ?? "提升外贸销售沟通与成交能力";
 
   const gen = await generateScenario({
     goalTitle,
@@ -45,6 +50,7 @@ export async function createPractice() {
         timezone: "Asia/Shanghai",
         updatedAt: new Date().toISOString(),
       } as NonNullable<typeof profile>),
+      focusSkillId,
   });
 
   if (!gen.ok || !gen.data) {
