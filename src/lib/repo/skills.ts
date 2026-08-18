@@ -40,11 +40,14 @@ export function skillById(id: string): SkillDef | undefined {
   return SKILLS.find((s) => s.id === id);
 }
 
-/** 技能掌握状态（skill_states 表映射） */
+/** 技能掌握状态（skill_states 表映射）。
+ * 掌握度单一真相来自 FSRS 的 stability（mastery 由 stability 派生，仅做展示）。 */
 export interface SkillState {
   userId: string;
   skillId: string;
-  mastery: number; // 0-1
+  mastery: number; // 0-1，由 stability 派生
+  stability: number; // FSRS S（天）
+  difficulty: number; // FSRS D（1-10）
   reps: number;
   lapses: number;
   nextReview: string | null; // ISO date

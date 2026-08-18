@@ -1,25 +1,17 @@
 import { pool } from "../db";
 import { skillById, type SkillState } from "./skills";
+import { reviewFsrs, masteryFromStability, mapDeltaToRating, DEFAULT_RETENTION, type Rating } from "../fsrs";
 import { getOrCreateUserId, isDbAvailable, LOCAL_USER_ID, localGetUser, localSaveUser } from "./storage";
 
 /**
  * 技能掌握状态 repo（skill_states 表映射）。
  *
- * V0.1 用"简化 FSRS"：复盘产出 skillUpdates（delta）后，
- * 按 掌握度加权移动平均 + 指数复习间隔 更新状态。
- * 完整 FSRS 内核（stability/difficulty 五参数）留到后续版本，
- * 但表字段已预留（DB schema 一致）。
+ * V0.2 起走完整 FSRS-4.5 内核：复盘产出 skillUpdates（delta）后，
+ * 把 delta 映射成 FSRS 评级(1-4)，用 stability/difficulty 五参数模型更新状态，
+ * mastery 由 stability 派生，nextReview 由 FSRS 间隔推出。DB schema 字段已就绪。
  */
 
 const STATES_KEY = "skillStates";
-
-/** 简化复习间隔（天），按掌握度指数递增 */
-export function nextIntervalDays(mastery: number): number {
-  if (mastery >= 0.85) return 7;
-  if (mastery >= 0.7) return 4;
-  if (mastery >= 0.5) return 2;
-  return 1;
-}
 
 export async function getSkillState(skillId: string, userId?: string): Promise<SkillState | null> {
   const uid = userId ?? LOCAL_USER_ID;
@@ -52,30 +44,48 @@ export async function listSkillStates(userId?: string): Promise<SkillState[]> {
   );
 }
 
-/** 复盘后批量更新技能状态：mastery 移动平均 + 复习计划推进 */
+/** 待复习技能：nextReview <= now */
+export async function dueSkillStates(userId?: string): Promise<SkillState[]> {
+  const now = Date.now();
+  return (await listSkillStates(userId)).filter(
+    (s) => s.nextReview != null && new Date(s.nextReview).getTime() <= now,
+  );
+}
+
+/** 复盘后批量更新技能状态：delta → FSRS 评级 → 更新 S/D/mastery/复习计划 */
 export async function applySkillUpdates(
   updates: { skillId: string; delta: number }[],
   userId?: string,
 ): Promise<SkillState[]> {
   const results: SkillState[] = [];
+  const now = Date.now();
   for (const u of updates) {
     const def = skillById(u.skillId);
     if (!def) continue;
     const prev = await getSkillState(u.skillId, userId);
-    const prevMastery = prev?.mastery ?? 0;
-    // delta 范围 -1..1（复盘给出），clamp 到 0-1
-    const mastery = Math.min(1, Math.max(0, prevMastery + u.delta));
-    const now = new Date();
-    const next = new Date(now);
-    next.setDate(next.getDate() + nextIntervalDays(mastery));
+    const prevState = prev
+      ? {
+          stability: prev.stability,
+          difficulty: prev.difficulty,
+          reps: prev.reps,
+          lapses: prev.lapses,
+          lastReview: prev.lastReview ? new Date(prev.lastReview).getTime() : null,
+          nextReview: prev.nextReview ? new Date(prev.nextReview).getTime() : null,
+        }
+      : { stability: 0, difficulty: 5, reps: 0, lapses: 0, lastReview: null, nextReview: null };
+
+    const rating: Rating = mapDeltaToRating(u.delta);
+    const next = reviewFsrs(prevState, rating, now, DEFAULT_RETENTION);
     const state: SkillState = {
       userId: userId ?? LOCAL_USER_ID,
       skillId: u.skillId,
-      mastery,
-      reps: (prev?.reps ?? 0) + 1,
-      lapses: (prev?.lapses ?? 0) + (u.delta < -0.1 ? 1 : 0),
-      nextReview: next.toISOString(),
-      lastReview: now.toISOString(),
+      mastery: masteryFromStability(next.stability),
+      stability: next.stability,
+      difficulty: next.difficulty,
+      reps: next.reps,
+      lapses: next.lapses,
+      nextReview: new Date(next.nextReview!).toISOString(),
+      lastReview: new Date(next.lastReview!).toISOString(),
     };
     results.push(state);
     await upsertState(state, userId);
@@ -88,6 +98,8 @@ function rowToState(row: Record<string, unknown>, userId: string): SkillState {
     userId,
     skillId: row.skill_id as string,
     mastery: Number(row.mastery ?? 0),
+    stability: Number(row.stability ?? 0),
+    difficulty: Number(row.difficulty ?? 5),
     reps: Number(row.reps ?? 0),
     lapses: Number(row.lapses ?? 0),
     nextReview: row.next_review ? new Date(row.next_review as string).toISOString() : null,
@@ -105,6 +117,8 @@ async function upsertState(state: SkillState, userId?: string): Promise<void> {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT (user_id, skill_id) DO UPDATE SET
          mastery = EXCLUDED.mastery,
+         stability = EXCLUDED.stability,
+         difficulty = EXCLUDED.difficulty,
          reps = EXCLUDED.reps,
          lapses = EXCLUDED.lapses,
          last_review = EXCLUDED.last_review,
@@ -114,8 +128,8 @@ async function upsertState(state: SkillState, userId?: string): Promise<void> {
         dbUid,
         state.skillId,
         state.mastery,
-        0, // stability 占位（简化版）
-        5, // difficulty 占位
+        state.stability,
+        state.difficulty,
         state.reps,
         state.lapses,
         state.lastReview,

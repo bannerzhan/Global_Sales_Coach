@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getProfile, isOnboarded } from "@/lib/repo/profile";
 import { listGoals } from "@/lib/repo/goal";
+import { dueSkillStates, listSkillStates } from "@/lib/repo/skill-state";
+import { skillById } from "@/lib/repo/skills";
 import { SignOutButton } from "./sign-out-button";
 
 /**
@@ -17,6 +19,8 @@ export default async function HomePage() {
 
   const profile = await getProfile();
   const goals = await listGoals();
+  const due = await dueSkillStates();
+  const states = await listSkillStates();
 
   return (
     <main className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
@@ -106,6 +110,65 @@ export default async function HomePage() {
               每天 {profile?.dailyMinutes ?? 30} 分钟，后续版本开放
             </p>
           </div>
+        </div>
+
+        <div className="mt-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+              复习与掌握
+            </h2>
+            <a href="/practice" className="text-sm text-teal-600 hover:underline dark:text-teal-400">
+              去演练 →
+            </a>
+          </div>
+
+          {due.length > 0 && (
+            <div className="mt-3 rounded-xl border border-teal-200 bg-teal-50/60 px-4 py-3 dark:border-teal-900 dark:bg-teal-950/30">
+              <p className="text-sm font-medium text-teal-800 dark:text-teal-300">
+                待复习（{due.length}）
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {due.map((s) => (
+                  <li
+                    key={s.skillId}
+                    className="rounded-full bg-white px-3 py-1 text-xs font-medium text-teal-700 ring-1 ring-teal-200 dark:bg-zinc-900 dark:text-teal-300 dark:ring-teal-900"
+                  >
+                    {skillById(s.skillId)?.name ?? s.skillId}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {states.length > 0 ? (
+            <ul className="mt-3 space-y-2.5">
+              {states.slice(0, 8).map((s) => (
+                <li
+                  key={s.skillId}
+                  className="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                      {skillById(s.skillId)?.name ?? s.skillId}
+                    </span>
+                    <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
+                      {Math.round(s.mastery * 100)}%
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <div
+                      className="h-full rounded-full bg-teal-500"
+                      style={{ width: `${Math.round(s.mastery * 100)}%` }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+              还没有练习记录，去「情景演练」完成第一场吧。
+            </p>
+          )}
         </div>
       </section>
     </main>
