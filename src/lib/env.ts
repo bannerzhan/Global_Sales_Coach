@@ -23,8 +23,14 @@ const envSchema = z.object({
   // 数据库
   DATABASE_URL: z.string().min(1, "DATABASE_URL 缺失"),
 
-  // Auth.js
+  // Auth.js 单用户登录
   AUTH_SECRET: z.string().min(8, "AUTH_SECRET 太短"),
+  // 登录邮箱（用户名）
+  AUTH_USER_EMAIL: z.string().email("AUTH_USER_EMAIL 非法").default("admin@gsc.local"),
+  // bcrypt hash（生成: htpasswd -bnBC 10 "" '密码' | tr -d ':\n'）
+  AUTH_USER_PASSWORD_HASH: z
+    .string()
+    .min(20, "AUTH_USER_PASSWORD_HASH 缺失或格式错误"),
 });
 
 const parsed = envSchema.safeParse(process.env);

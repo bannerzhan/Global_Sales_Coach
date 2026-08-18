@@ -25,6 +25,12 @@ set -a; source .env; set +a
 : "${AUTH_SECRET:?AUTH_SECRET 未设置}"
 : "${AUTH_USER_EMAIL:?AUTH_USER_EMAIL 未设置}"
 : "${AUTH_USER_PASSWORD_HASH:?AUTH_USER_PASSWORD_HASH 未设置}"
+# 防御校验：hash 应形如 $2y$10$...（\$ 转义被 bash source 还原成字面 $）。
+# 若值不以 $2 开头，多半是用户直接粘贴了含 $ 的原始 hash 或写错，提前拦截。
+case "${AUTH_USER_PASSWORD_HASH}" in
+  '$2'*) : ;;  # 字面 $ 开头（\$2 转义还原）
+  *) echo "!! AUTH_USER_PASSWORD_HASH 格式异常（应形如 \\$2y\\$10\\$...）。请检查 .env：hash 中每个 \$ 都必须写成 \\\$（见 .env.example 注释）"; exit 1 ;;
+esac
 if [ "${POSTGRES_PASSWORD:-}" = "gsc_dev_password" ] || [ -z "${POSTGRES_PASSWORD:-}" ]; then
   echo "!! POSTGRES_PASSWORD 仍是默认值，生成随机密码并写回 .env"
   GEN=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)
