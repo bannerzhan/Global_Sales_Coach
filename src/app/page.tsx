@@ -4,7 +4,10 @@ import { getProfile, isOnboarded } from "@/lib/repo/profile";
 import { listGoals } from "@/lib/repo/goal";
 import { dueSkillStates, listSkillStates } from "@/lib/repo/skill-state";
 import { skillById } from "@/lib/repo/skills";
+import { getLatestBaseline } from "@/lib/repo/assessment";
+import { ASSESSMENT_DIM_LABEL } from "@/lib/llm/assessment";
 import { SignOutButton } from "./sign-out-button";
+import { BudgetStatus } from "./budget-status";
 
 /**
  * 首页（登录后可见，proxy.ts 已拦截未登录请求）。
@@ -21,6 +24,7 @@ export default async function HomePage() {
   const goals = await listGoals();
   const due = await dueSkillStates();
   const states = await listSkillStates();
+  const baseline = await getLatestBaseline();
 
   return (
     <main className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
@@ -49,6 +53,44 @@ export default async function HomePage() {
             {profile.markets.length > 0 ? ` · 目标市场 ${profile.markets.join("/")}` : ""}
           </p>
         )}
+
+        <div className="mt-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+              能力基线
+            </h2>
+            <a href="/assessment" className="text-sm text-teal-600 hover:underline dark:text-teal-400">
+              {baseline ? "重新测评" : "去测评"} →
+            </a>
+          </div>
+          {baseline ? (
+            <ul className="mt-3 space-y-2.5">
+              {baseline.dimensionScores.map((s) => (
+                <li
+                  key={s.dimension}
+                  className="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                      {ASSESSMENT_DIM_LABEL[s.dimension as keyof typeof ASSESSMENT_DIM_LABEL] ?? s.dimension}
+                    </span>
+                    <span className="shrink-0 text-xs text-zinc-400">{s.score}/10</span>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <div
+                      className="h-full rounded-full bg-teal-500"
+                      style={{ width: `${s.score * 10}%` }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+              还没有能力基线，<a href="/assessment" className="text-teal-600 hover:underline dark:text-teal-400">点这里花 1 分钟测一下</a>，定制你的训练起点。
+            </p>
+          )}
+        </div>
 
         <div className="mt-8">
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
@@ -175,6 +217,7 @@ export default async function HomePage() {
             </p>
           )}
         </div>
+        <BudgetStatus />
       </section>
     </main>
   );

@@ -172,6 +172,7 @@ bash deploy.sh your-domain.com     # 自动替换域名、生成随机 DB 密码
 - [x] 核心学习闭环（场景 → 角色扮演 → 复盘）
 - [x] FSRS-4.5 复习调度（替换简化版）
 - [x] 待复习驱动的专项演练闭环
+- [x] **V0.1 DoD 补强**：基线评估（3 聚合维度）、成本护栏全字段记账+告警、PWA 可安装、反幻觉策略（feedback_language/feedback_business 分离 + 专项测试）
 - [ ] **生产部署到香港轻量服务器**（部署体系已就绪，待服务器凭据）
 - [ ] **memories 向量记忆**（pgvector 表已建，待 embedding 接入点）
 - [ ] **FSRS 训练器**（用真实复习历史微调权重）

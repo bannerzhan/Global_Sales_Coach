@@ -1,5 +1,5 @@
 import { chat } from "./provider";
-import { recordRun } from "./accounting";
+import { recordRun, estimateCost, evaluateAlertsAfterRun } from "./accounting";
 import type { Persona, RoleplayTurn, Scenario } from "../repo/types";
 
 /**
@@ -13,6 +13,7 @@ export interface ReplyInput {
   turns: RoleplayTurn[]; // 完整历史（含开场白）
   latestUserMessage: string;
   userId?: string | null;
+  sessionId?: string | null;
 }
 
 const PRESSURE_EVERY_TURNS = 2; // 每 2 轮用户发言推进一次压力
@@ -23,7 +24,7 @@ export async function customerReply(input: ReplyInput): Promise<{
   pressureStep: number;
   error?: string;
 }> {
-  const { scenario, turns, latestUserMessage, userId } = input;
+  const { scenario, turns, latestUserMessage, userId, sessionId } = input;
 
   // 计算压力步数：用户发言次数（含本次）
   const userTurns = turns.filter((t) => t.role === "user").length + 1;
@@ -81,13 +82,27 @@ export async function customerReply(input: ReplyInput): Promise<{
       userId,
       taskType: "generate_roleplay",
       model: resp.model,
+      tier: "turbo",
+      provider: "volc-ark",
       status: "ok",
       retryCount: 0,
       inputTokens: resp.usage.inputTokens,
       outputTokens: resp.usage.outputTokens,
       reasoningTokens: resp.usage.reasoningTokens,
+      sessionId,
       latencyMs: resp.latencyMs,
     }).catch(() => {});
+    // 跑后预算告警评估
+    void evaluateAlertsAfterRun({
+      userId,
+      sessionId,
+      costYuan: estimateCost(
+        "turbo",
+        resp.usage.inputTokens,
+        resp.usage.outputTokens,
+        resp.usage.reasoningTokens,
+      ),
+    });
 
     return { ok: true, reply, pressureStep };
   } catch (err) {

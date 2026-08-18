@@ -25,6 +25,16 @@ export const ReviewSchema = z.object({
     .max(3),
   highlights: z.array(z.string()).min(1, "至少 1 个亮点").max(3),
   improvements: z.array(z.string()).min(1, "至少 1 条改进建议").max(4),
+  // 语言反馈与商业建议严格区分（§3.5）
+  feedbackLanguage: z
+    .array(z.string())
+    .min(1, "至少 1 条表达/语言层面的改进")
+    .max(4)
+    .describe("表达、句式、用词、沟通技巧等语言层面改进建议"),
+  feedbackBusiness: z
+    .array(z.string())
+    .max(4)
+    .describe("涉及 Incoterms/支付/法律/税务等商业规则时的核实提示；无则留空数组"),
   skillUpdates: z
     .array(
       z.object({
@@ -53,6 +63,7 @@ export interface ReviewInput {
   objectives: string[];
   turns: RoleplayTurn[];
   userId?: string | null;
+  sessionId?: string | null;
 }
 
 export async function reviewSession(input: ReviewInput): Promise<{
@@ -76,6 +87,7 @@ export async function reviewSession(input: ReviewInput): Promise<{
       maxRetries: 1,
       maxTokens: 2048,
       userId: input.userId,
+      sessionId: input.sessionId,
       fallback: () => ({
         score: 5,
         dimensionScores: DIMENSIONS.map((d) => ({
@@ -85,6 +97,8 @@ export async function reviewSession(input: ReviewInput): Promise<{
         })),
         highlights: ["完成了演练"],
         improvements: ["需求挖掘不够深入", "建议多做一轮练习"],
+        feedbackLanguage: ["注意用更具体的提问替代泛泛而谈", "可多用开放式问题探需求"],
+        feedbackBusiness: [],
         skillUpdates: input.objectives.slice(0, 2).map((sid) => ({
           skillId: sid,
           delta: 0.05,
@@ -94,16 +108,21 @@ export async function reviewSession(input: ReviewInput): Promise<{
       }),
       system:
         "你是 Global Sales Coach 的首席销售教练，对刚结束的一场角色扮演演练做复盘。\n" +
+        "【行为准则（固定，不可改）】\n" +
+        "1. 只用下方对话与已知信息，绝不虚构用户的公司、行业、客户、订单、金额等事实。\n" +
+        "2. 语言反馈与商业建议严格区分：可纠正表达错误；绝不编造 Incoterms / 支付条款 / 法律 / 税务 / 关税规则。涉及外部商业规则时只在 feedbackBusiness 里标注「建议核实」并给官方渠道，不替模型编数字。\n" +
         "输出要求：\n" +
         "1. score 是 0-10 的总分，反映整体销售表现\n" +
         "2. dimensionScores 固定评 3 个维度：" +
         DIMENSIONS.map((d) => `${d}（${DIM_LABEL[d]}）`).join("、") + "\n" +
         "3. highlights 给 1-3 条具体亮点（引用对话里的原话更好）\n" +
         "4. improvements 给 1-4 条可执行改进（不是空话，要具体到动作）\n" +
-        "5. skillUpdates 从以下技能池选 1-4 个，delta 表示掌握度增减（-0.3~+0.3）：\n" +
+        "5. feedbackLanguage：1-4 条表达/语言层面的改进（句式、用词、提问技巧等）\n" +
+        "6. feedbackBusiness：涉及商业规则时的核实提示；没有则给空数组 []\n" +
+        "7. skillUpdates 从以下技能池选 1-4 个，delta 表示掌握度增减（-0.3~+0.3）：\n" +
         `   ${skillPool}\n` +
-        "6. turnFeedback 挑 0-8 个关键轮次给逐轮点评（turnIndex 对应对话序号）\n" +
-        "7. 全部用中文输出",
+        "8. turnFeedback 挑 0-8 个关键轮次给逐轮点评（turnIndex 对应对话序号）\n" +
+        "9. 全部用中文输出",
     },
     [
       {

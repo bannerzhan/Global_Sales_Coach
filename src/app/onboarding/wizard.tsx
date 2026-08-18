@@ -9,13 +9,25 @@ import {
   type EnglishDimension,
   type Profile,
 } from "@/lib/repo/types";
-import { completeOnboarding, suggestGoalsAction, type OnboardingInput } from "./actions";
+import {
+  suggestGoalsAction,
+  submitOnboarding,
+  type OnboardingInput,
+} from "./actions";
 import type { GoalSuggestion } from "@/lib/llm/goal-suggest";
 
 /** 与 actions.ts 的 OnboardingInput.profile 一致（不含 userId/updatedAt） */
 type ProfileInput = OnboardingInput["profile"];
 
-const STEPS = ["基本信息", "投入与水平", "学习目标"] as const;
+/** 基线评估的 3 个聚合维度（本地定义，避免把 server 模块打进 client bundle） */
+const ASSESS_DIMS = [
+  { key: "communication", label: "沟通表达" },
+  { key: "deal_advancement", label: "推进成交" },
+  { key: "trust_building", label: "信任建立" },
+] as const;
+type SelfRatings = Record<(typeof ASSESS_DIMS)[number]["key"], number>;
+
+const STEPS = ["基本信息", "投入与水平", "学习目标", "能力自评"] as const;
 
 const EMPTY_PROFILE: ProfileInput = {
   occupation: "",
@@ -36,6 +48,12 @@ export function OnboardingWizard() {
   const [suggesting, setSuggesting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selfRatings, setSelfRatings] = useState<SelfRatings>({
+    communication: 3,
+    deal_advancement: 3,
+    trust_building: 3,
+  });
+  const [assessContext, setAssessContext] = useState("");
 
   const set = <K extends keyof ProfileInput>(k: K, v: ProfileInput[K]) =>
     setProfile((p) => ({ ...p, [k]: v }));
@@ -61,8 +79,8 @@ export function OnboardingWizard() {
     }
     setError(null);
     setSubmitting(true);
-    await completeOnboarding({ profile, goals });
-    // completeOnboarding 内部 redirect，这里兜底刷新
+    await submitOnboarding({ profile, goals, selfRatings, context: assessContext });
+    // submitOnboarding 内部 redirect，这里兜底刷新
     router.push("/");
   }
 
@@ -269,6 +287,45 @@ export function OnboardingWizard() {
             </button>
           </div>
         )}
+
+      {step === 3 && (
+        <div className="space-y-5">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            为你自己打个分（1-5，1=入门 5=熟练）。AI 会据此生成你的能力基线，约 1 分钟。
+          </p>
+          {ASSESS_DIMS.map((d) => (
+            <div key={d.key}>
+              <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                {d.label}：{selfRatings[d.key]}/5
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                step={1}
+                value={selfRatings[d.key]}
+                onChange={(e) =>
+                  setSelfRatings((r) => ({ ...r, [d.key]: Number(e.target.value) }))
+                }
+                className="w-full accent-teal-600"
+              />
+            </div>
+          ))}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              补充经历（选填）
+            </label>
+            <textarea
+              value={assessContext}
+              onChange={(e) => setAssessContext(e.target.value)}
+              rows={3}
+              placeholder="简单描述一段你最近的外贸沟通经历，帮助 AI 更准判断……"
+              className="w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            />
+          </div>
+        </div>
+      )}
+
       </div>
 
       {/* 底部导航 */}
@@ -283,7 +340,7 @@ export function OnboardingWizard() {
             上一步
           </button>
         )}
-        {step < 2 ? (
+        {step < STEPS.length - 1 ? (
           <button
             type="button"
             onClick={() => setStep((s) => s + 1)}
@@ -298,7 +355,7 @@ export function OnboardingWizard() {
             disabled={submitting}
             className="h-11 flex-1 rounded-lg bg-teal-600 font-semibold text-white shadow-sm transition hover:bg-teal-700 disabled:opacity-60"
           >
-            {submitting ? "保存中…" : "开始训练 🚀"}
+            {submitting ? "生成基线中…" : "开始训练 🚀"}
           </button>
         )}
       </div>

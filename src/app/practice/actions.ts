@@ -108,6 +108,7 @@ export async function sendMessage(
     scenario,
     turns: updated.turns,
     latestUserMessage: text,
+    sessionId,
   });
 
   if (!reply.ok || !reply.reply) {
@@ -139,6 +140,7 @@ export async function finishPractice(sessionId: string) {
     persona: scenario?.persona ?? { role: "客户", nationality: "未知", temperament: "未知" },
     objectives: scenario?.objectives ?? [],
     turns: completed.turns,
+    sessionId,
   });
 
   if (review.ok && review.data) {
@@ -171,6 +173,7 @@ export async function retryReview(sessionId: string): Promise<{ ok: boolean; err
     persona: scenario?.persona ?? { role: "客户", nationality: "未知", temperament: "未知" },
     objectives: scenario?.objectives ?? [],
     turns: session.turns,
+    sessionId,
   });
   if (!review.ok || !review.data) return { ok: false, error: "复盘失败，请重试" };
 

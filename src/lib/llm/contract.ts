@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { chat, ProviderError, type ChatMessage, type ModelTier } from "./provider";
-import { recordRun, checkAllBudgets, type RunStatus } from "./accounting";
+import {
+  recordRun,
+  checkAllBudgets,
+  estimateCost,
+  evaluateAlertsAfterRun,
+  PROVIDER,
+  type RunStatus,
+} from "./accounting";
 
 /**
  * 输出契约链（PRD P0）：
@@ -45,6 +52,10 @@ export interface ContractDefinition<T> {
   temperature?: number;
   /** 单次调用最大输出 token（也用于成本预检） */
   maxTokens?: number;
+  /** 会话级预算追踪（roleplay session id） */
+  sessionId?: string | null;
+  /** 供应商标识（默认 volc-ark） */
+  provider?: string;
 }
 
 export type ContractResult<T> =
@@ -127,6 +138,8 @@ export async function runContract<T>(
     userId,
     temperature,
     maxTokens = 4096,
+    sessionId = null,
+    provider,
   } = def;
 
   const attempts: AttemptOutcome<T>[] = [];
@@ -159,22 +172,30 @@ export async function runContract<T>(
     }
 
     try {
-      // ---- 成本护栏预检（request 级粗查：用输出上限估算） ----
+      // ---- 成本护栏预检（用输出上限估算，四级预算） ----
       const guard = await checkAllBudgets({
         userId,
+        sessionId,
         tier,
         inputTokens: estimateInputTokens(userMessages),
         outputTokens: maxTokens,
         reasoningTokens: 0,
       });
-      if (!guard.allowed) {
-        const msg = `成本护栏拦截（${guard.decision?.scope} 超限）`;
+      // block：直接拒绝（dead_letter）
+      if (!guard.allowed && guard.decision?.action === "block") {
+        const msg = `成本护栏拦截（${guard.decision.scope} 超限，block）`;
         attempts.push({ status: "dead_letter", error: msg });
         break;
       }
+      // degrade：降级到 turbo 继续（不阻断业务）
+      let effectiveTier: ModelTier = tier;
+      if (!guard.allowed && guard.decision?.action === "degrade") {
+        effectiveTier = "turbo";
+        console.warn(`[contract] ${taskType} 预算降级为 turbo（${guard.decision.scope} 超限）`);
+      }
 
       const resp = await chat({
-        tier,
+        tier: effectiveTier,
         temperature,
         maxTokens,
         tools,
@@ -225,13 +246,27 @@ export async function runContract<T>(
           userId,
           taskType,
           model: resp.model,
+          tier: effectiveTier,
+          provider: provider ?? PROVIDER,
           promptVersion,
           status: attempt === 0 ? "ok" : "retried",
           retryCount: attempt,
           inputTokens: resp.usage.inputTokens,
           outputTokens: resp.usage.outputTokens,
           reasoningTokens: resp.usage.reasoningTokens,
+          sessionId,
           latencyMs: resp.latencyMs,
+        });
+        // 跑后按实际花费评估各累计级预算告警（记录不静默）
+        void evaluateAlertsAfterRun({
+          userId,
+          sessionId,
+          costYuan: estimateCost(
+            effectiveTier,
+            resp.usage.inputTokens,
+            resp.usage.outputTokens,
+            resp.usage.reasoningTokens,
+          ),
         });
         return { ok: true, data: parsed, runId, attempts: attempt + 1, degraded: false };
       }
@@ -268,12 +303,15 @@ export async function runContract<T>(
       userId,
       taskType,
       model: "template",
+      tier,
+      provider: provider ?? PROVIDER,
       promptVersion,
       status: "degraded",
       retryCount: attempts.length,
       inputTokens: 0,
       outputTokens: 0,
       reasoningTokens: 0,
+      sessionId,
       latencyMs: null,
       error: failError,
     });
@@ -290,12 +328,15 @@ export async function runContract<T>(
     userId,
     taskType,
     model: "dead_letter",
+    tier,
+    provider: provider ?? PROVIDER,
     promptVersion,
     status: "dead_letter",
     retryCount: attempts.length,
     inputTokens: 0,
     outputTokens: 0,
     reasoningTokens: 0,
+    sessionId,
     latencyMs: null,
     error: failError,
   });

@@ -24,11 +24,11 @@
 **明确不做（第二批）**：语音（STT/TTS）、录音、音频文件存储。Phase 2 再上。
 
 ### 第一批验收 DoD（Acceptance Criteria）
-- [ ] 从零注册 → 登录 → Onboarding 问卷 → 基线评估（<5min）→ 生成今日 LessonSpec → 文字 Roleplay 对话 → 提交回答 → Evaluation 打分 + 纠错 + 给更好表达 + **立刻重练（Immediate Retry）** → Skill/Memory 更新 → 明日课程按 FSRS 调度
-- [ ] 核心学习闭环跑通（Attempt → 纠错 → 更好表达 → 重练 → 更新 → 调度）
-- [ ] 无 LLM 幻觉用户事实：用虚构 user 测试，prompt 里没有的信息模型不得编造（profile/goal/skill/memory/scenario 细节）
-- [ ] 成本护栏生效：ai_runs 全字段记账；四级预算（request/session/user_daily/global）超限告警/降级
-- [ ] 移动端可用：Android Chrome + iOS Safari 核心流程可走通（PWA 可安装）
+- [x] 从零注册 → 登录 → Onboarding 问卷 → 基线评估（<5min）→ 生成今日 LessonSpec → 文字 Roleplay 对话 → 提交回答 → Evaluation 打分 + 纠错 + 给更好表达 + **立刻重练（Immediate Retry）** → Skill/Memory 更新 → 明日课程按 FSRS 调度
+- [x] 核心学习闭环跑通（Attempt → 纠错 → 更好表达 → 重练 → 更新 → 调度）
+- [x] 无 LLM 幻觉用户事实：用虚构 user 测试，prompt 里没有的信息模型不得编造（profile/goal/skill/memory/scenario 细节）—— `scripts/test-no-hallucination.ts` 专项测试 + review 输出分离 feedback_language/feedback_business
+- [x] 成本护栏生效：ai_runs 全字段记账（provider/cost_estimate/session_id）；四级预算（request/session/user_daily/global）超限告警/降级，告警落 cost_alerts 不静默
+- [x] 移动端可用：Android Chrome + iOS Safari 核心流程可走通（PWA 可安装：manifest + service worker + 图标）
 - [ ] 单用户登录保护：未登录不可访问任何业务页
 - [ ] 无语音、无第三方供应商依赖（除火山引擎一家）
 

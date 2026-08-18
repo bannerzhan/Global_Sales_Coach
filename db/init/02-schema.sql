@@ -77,6 +77,18 @@ CREATE TABLE IF NOT EXISTS skill_states (
   PRIMARY KEY (user_id, skill_id)
 );
 
+-- 基线评估快照（Onboarding 末尾跑一次，3 个销售结果导向聚合维度）
+CREATE TABLE IF NOT EXISTS assessments (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  dimension_scores  JSONB NOT NULL,                  -- [{dimension, score 0-10, summary}]
+  overall_summary   TEXT,
+  self_ratings      JSONB,                           -- 用户自评（1-5），可选
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS assessments_user_created_idx ON assessments (user_id, created_at DESC);
+
 -- ------------------------------------------------------------
 -- 4. 场景库（可编辑，Agent 生成 seed + 用户审核）
 -- ------------------------------------------------------------
@@ -171,6 +183,7 @@ CREATE TABLE IF NOT EXISTS ai_runs (
   id               BIGSERIAL PRIMARY KEY,
   user_id          UUID REFERENCES users(id) ON DELETE SET NULL,
   task_type        TEXT NOT NULL,
+  provider         TEXT NOT NULL DEFAULT 'volc-ark', -- 供应商（V0.1 仅火山方舟）
   model            TEXT NOT NULL,                   -- endpoint id 或 model id
   prompt_version   INT,
   status           TEXT NOT NULL DEFAULT 'pending', -- pending / ok / schema_invalid / business_invalid / retried / degraded / dead_letter
@@ -178,10 +191,24 @@ CREATE TABLE IF NOT EXISTS ai_runs (
   input_tokens     INT NOT NULL DEFAULT 0,
   output_tokens    INT NOT NULL DEFAULT 0,
   reasoning_tokens INT NOT NULL DEFAULT 0,          -- 思考模型必记
+  cost_estimate    NUMERIC(10,5) NOT NULL DEFAULT 0,-- 本次估算成本（元）
+  session_id       TEXT,                            -- 会话级预算追踪（roleplay session id）
   latency_ms       INT,
   error            TEXT,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 成本护栏告警记录（超限即落库，不静默）
+CREATE TABLE IF NOT EXISTS cost_alerts (
+  id          BIGSERIAL PRIMARY KEY,
+  scope       TEXT NOT NULL,                       -- request / session / user_daily / global
+  level       TEXT NOT NULL,                       -- warn / degrade / block
+  used_yuan   NUMERIC(10,5) NOT NULL DEFAULT 0,
+  limit_yuan  NUMERIC(10,5) NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS cost_alerts_scope_created_idx ON cost_alerts (scope, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS ai_runs_user_created_idx ON ai_runs (user_id, created_at DESC);
 

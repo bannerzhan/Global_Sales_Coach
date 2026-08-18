@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { SWRegister } from "./sw-register";
 
 /**
  * 字体策略：不使用 next/font/google（国内环境无法访问 fonts.gstatic.com，
@@ -8,7 +9,18 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Global Sales Coach",
-  description: "AI 驱动的销售能力训练教练",
+  description: "AI 驱动的外贸销售能力训练教练",
+  manifest: "/manifest.webmanifest",
+  applicationName: "Global Sales Coach",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Global Sales Coach",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -21,7 +33,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="zh-CN" className="h-full antialiased">
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        {children}
+        <SWRegister />
+      </body>
     </html>
   );
 }
