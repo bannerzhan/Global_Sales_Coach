@@ -25,6 +25,7 @@ export const PROVIDER = "volc-ark";
 const PRICING: Record<string, { input: number; output: number; reasoning: number }> = {
   pro: { input: 0.002, output: 0.008, reasoning: 0.002 },
   turbo: { input: 0.001, output: 0.004, reasoning: 0 },
+  flash: { input: 0.0002, output: 0.002, reasoning: 0 },
   default: { input: 0.002, output: 0.008, reasoning: 0 },
 };
 

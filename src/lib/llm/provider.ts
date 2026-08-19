@@ -5,14 +5,15 @@ import { env } from "../env";
  * 火山方舟 LLM Provider（OpenAI 兼容协议封装）。
  *
  * 模型档位：
- *  - pro    → 复杂推理任务（学习路径规划、评估、纠错分析）
- *  - turbo  → 高频轻任务（对话、角色扮演生成、即时反馈）
+ *  - pro    → 复杂推理/规划任务（学习路径规划、复盘分析、场景/目标生成）
+ *  - turbo  → 通用档（历史兼容默认）
+ *  - flash  → 高频实时对话（角色扮演客户、即时反馈），非思考快模型，延迟最低
  *
  * 接入点（ep-）优先，未配置时回退模型 ID。
  * 2.1 系列思考模型会返回 reasoning_content，需透传给记账层。
  */
 
-export type ModelTier = "pro" | "turbo";
+export type ModelTier = "pro" | "turbo" | "flash";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -72,6 +73,9 @@ export function getClient(): OpenAI {
 export function resolveModel(tier: ModelTier): string {
   if (tier === "pro") {
     return env.ARK_ENDPOINT_PRO || env.ARK_MODEL_PRO || "doubao-seed-2.1-pro-260628";
+  }
+  if (tier === "flash") {
+    return env.ARK_ENDPOINT_FLASH || env.ARK_MODEL_FLASH || "doubao-seed-2.0-mini";
   }
   return env.ARK_ENDPOINT_TURBO || env.ARK_MODEL_TURBO || "doubao-seed-2.1-turbo-260628";
 }

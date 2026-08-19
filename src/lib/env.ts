@@ -17,8 +17,10 @@ const envSchema = z.object({
   // 接入点 ID（ep- 开头）优先；没有接入点就退到模型 ID
   ARK_ENDPOINT_PRO: z.string().optional(),
   ARK_ENDPOINT_TURBO: z.string().optional(),
+  ARK_ENDPOINT_FLASH: z.string().optional(),
   ARK_MODEL_PRO: z.string().optional(),
   ARK_MODEL_TURBO: z.string().optional(),
+  ARK_MODEL_FLASH: z.string().optional(),
 
   // 数据库
   DATABASE_URL: z.string().min(1, "DATABASE_URL 缺失"),

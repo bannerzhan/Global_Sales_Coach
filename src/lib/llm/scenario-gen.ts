@@ -61,7 +61,7 @@ export async function generateScenario({
   const result = await runContract<ScenarioGenResult>(
     {
       taskType: "generate_scenario",
-      tier: "turbo",
+      tier: "pro",
       toolName: "emit_scenario",
       toolDescription: "根据学习目标和用户画像生成一个销售演练场景",
       schema: ScenarioGenSchema,

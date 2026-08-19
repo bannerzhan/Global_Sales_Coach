@@ -79,8 +79,8 @@ export async function runAssessment(input: AssessmentInput): Promise<{
     `请输出基线评估。`;
 
   const result = await runContract<AssessmentOutput>({
-    taskType: "baseline_assessment",
-    tier: "turbo",
+      taskType: "baseline_assessment",
+      tier: "flash",
     toolName: "emit_assessment",
     toolDescription: "对外贸销售能力做基线评估，输出 3 个聚合维度评分",
     schema: AssessmentSchema,

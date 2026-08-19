@@ -52,7 +52,7 @@ export async function customerReply(input: ReplyInput): Promise<{
 
   try {
     const resp = await chat({
-      tier: "turbo",
+      tier: "flash",
       temperature: 0.8,
       maxTokens: 512,
       messages: [
@@ -89,7 +89,7 @@ export async function customerReply(input: ReplyInput): Promise<{
       userId,
       taskType: "generate_roleplay",
       model: resp.model,
-      tier: "turbo",
+      tier: "flash",
       provider: "volc-ark",
       status: "ok",
       retryCount: 0,
@@ -104,7 +104,7 @@ export async function customerReply(input: ReplyInput): Promise<{
       userId,
       sessionId,
       costYuan: estimateCost(
-        "turbo",
+        "flash",
         resp.usage.inputTokens,
         resp.usage.outputTokens,
         resp.usage.reasoningTokens,
