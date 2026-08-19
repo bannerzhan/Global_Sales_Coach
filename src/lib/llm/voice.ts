@@ -9,8 +9,8 @@ const TTS_URL = "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional
 
 // 语音 key 等走运行时 process.env 优先（Next build 会固化 env.ts 值，
 // 动态读取让部署后改 key 只重启容器、不必 rebuild）
-function voiceEnv(key: keyof typeof env) {
-  return process.env[key] ?? env[key];
+function voiceEnv(key: keyof typeof env): string {
+  return (process.env[key] ?? env[key]) ?? "";
 }
 
 export interface AsrResult {
