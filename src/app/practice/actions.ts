@@ -90,7 +90,8 @@ export async function sendMessage(
   const text = content.trim();
   if (!text) return { ok: false, error: "消息不能为空" };
 
-  const session = await getRoleplaySession(sessionId);
+  const uid = (await auth())?.user?.id;
+  const session = await getRoleplaySession(sessionId, uid);
   if (!session) return { ok: false, error: "演练不存在" };
   if (session.status !== "active") return { ok: false, error: "演练已结束" };
 
@@ -104,10 +105,10 @@ export async function sendMessage(
     pressureStep: 0,
     createdAt: new Date().toISOString(),
   };
-  await appendTurn(sessionId, userTurn);
+  await appendTurn(sessionId, userTurn, uid);
 
   // 2. AI 客户回复
-  const updated = (await getRoleplaySession(sessionId))!;
+  const updated = (await getRoleplaySession(sessionId, uid))!;
   const reply = await customerReply({
     scenario,
     turns: updated.turns,
@@ -126,17 +127,18 @@ export async function sendMessage(
     pressureStep: reply.pressureStep,
     createdAt: new Date().toISOString(),
   };
-  await appendTurn(sessionId, aiTurn);
+  await appendTurn(sessionId, aiTurn, uid);
 
   return { ok: true, userTurn, aiTurn };
 }
 
 /** 结束演练并复盘：评分 + 技能状态更新，跳转复盘页 */
 export async function finishPractice(sessionId: string) {
-  const session = await getRoleplaySession(sessionId);
+  const uid = (await auth())?.user?.id;
+  const session = await getRoleplaySession(sessionId, uid);
   if (!session) throw new Error("演练不存在");
 
-  const completed = (await completeSession(sessionId)) ?? session;
+  const completed = (await completeSession(sessionId, uid)) ?? session;
   const scenario = await getScenario(session.scenarioId);
 
   // 复盘（失败不阻断：页面提供重试按钮）
@@ -153,17 +155,20 @@ export async function finishPractice(sessionId: string) {
     const data: ReviewOutput = review.data;
     // 落 attempts 记录（task_type=roleplay_turn，evaluation=复盘结果）
     const lastUserTurn = [...completed.turns].reverse().find((t) => t.role === "user");
-    await createAttempt({
-      scenarioId: session.scenarioId,
-      taskType: "roleplay_turn",
-      userInput: lastUserTurn?.content ?? "",
-      evaluation: { review: data, degraded: review.degraded ?? false },
-      score: data.score,
-      isRetry: false,
-      attemptNo: 1,
-    });
+    await createAttempt(
+      {
+        scenarioId: session.scenarioId,
+        taskType: "roleplay_turn",
+        userInput: lastUserTurn?.content ?? "",
+        evaluation: { review: data, degraded: review.degraded ?? false },
+        score: data.score,
+        isRetry: false,
+        attemptNo: 1,
+      },
+      uid,
+    );
     // 更新技能状态
-    await applySkillUpdates(data.skillUpdates);
+    await applySkillUpdates(data.skillUpdates, uid);
   }
 
   redirect(`/practice/${sessionId}/review`);
@@ -171,7 +176,8 @@ export async function finishPractice(sessionId: string) {
 
 /** 复盘页重试复盘（首次失败时用） */
 export async function retryReview(sessionId: string): Promise<{ ok: boolean; error?: string }> {
-  const session = await getRoleplaySession(sessionId);
+  const uid = (await auth())?.user?.id;
+  const session = await getRoleplaySession(sessionId, uid);
   if (!session) return { ok: false, error: "演练不存在" };
   const scenario = await getScenario(session.scenarioId);
   const review = await reviewSession({
@@ -184,13 +190,14 @@ export async function retryReview(sessionId: string): Promise<{ ok: boolean; err
   });
   if (!review.ok || !review.data) return { ok: false, error: "复盘失败，请重试" };
 
-  await createAttempt({
-    scenarioId: session.scenarioId,
-    taskType: "roleplay_turn",
-    userInput: "",
-    evaluation: { review: review.data, degraded: review.degraded ?? false },
-    score: review.data.score,
-    isRetry: false,
+  await createAttempt(
+    {
+      scenarioId: session.scenarioId,
+      taskType: "roleplay_turn",
+      userInput: "",
+      evaluation: { review: review.data, degraded: review.degraded ?? false },
+      score: review.data.score,
+      isRetry: false,
     attemptNo: 1,
   });
   await applySkillUpdates(review.data.skillUpdates);
