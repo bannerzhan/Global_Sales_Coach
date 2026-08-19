@@ -414,16 +414,16 @@ async function recentAlertExists(scope: string): Promise<boolean> {
 
 async function recentAlertsList(): Promise<{ scope: string; level: string; usedYuan: number; createdAt: string }[]> {
   try {
+    // created_at 用 ::text cast 让 pg 直接返回 string（pg-node 默认是 Date，会让 React 渲染炸）
     const { rows } = await pool.query<{ scope: string; level: string; used_yuan: number; created_at: string }>(
-      `SELECT scope, level, used_yuan, created_at FROM cost_alerts
+      `SELECT scope, level, used_yuan, created_at::text AS created_at FROM cost_alerts
        ORDER BY created_at DESC LIMIT 10`,
     );
     return rows.map((r) => ({
       scope: r.scope,
       level: r.level,
       usedYuan: Number(r.used_yuan),
-      // pg-node 默认把 created_at 解析成 JS Date 对象，渲染会炸 React
-      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+      createdAt: r.created_at,
     }));
   } catch {
     return [];
