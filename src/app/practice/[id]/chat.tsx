@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { sendMessage, finishPractice } from "../actions";
 import type { RoleplayTurn } from "@/lib/repo/types";
+import { VoiceInputButton } from "@/components/voice-input-button";
+import { VoicePlayButton } from "@/components/voice-play-button";
 
 /**
  * 角色扮演聊天界面（移动端优先）。
@@ -112,8 +114,12 @@ export function ChatView({
                 }
               }}
               rows={1}
-              placeholder="你的发言（Enter 发送）"
+              placeholder="你的发言（Enter 发送，🎤 语音输入）"
               className="max-h-32 flex-1 resize-none rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-base text-zinc-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            />
+            <VoiceInputButton
+              disabled={sending || !active}
+              onText={(t) => setInput((prev) => (prev ? `${prev}${t}` : t))}
             />
             <button
               type="submit"
@@ -150,14 +156,21 @@ function MessageBubble({ turn }: { turn: RoleplayTurn }) {
   const isUser = turn.role === "user";
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
-          isUser
-            ? "rounded-tr-sm bg-teal-600 text-white"
-            : "rounded-tl-sm bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
-        }`}
-      >
-        {turn.content}
+      <div className="max-w-[80%]">
+        <div
+          className={`whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
+            isUser
+              ? "rounded-tr-sm bg-teal-600 text-white"
+              : "rounded-tl-sm bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
+          }`}
+        >
+          {turn.content}
+        </div>
+        {!isUser && (
+          <div className="mt-1">
+            <VoicePlayButton text={turn.content} />
+          </div>
+        )}
       </div>
     </div>
   );
