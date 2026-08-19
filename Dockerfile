@@ -2,7 +2,9 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --registry=https://registry.npmmirror.com --no-audit --no-fund
+# --ignore-scripts: onnxruntime-node 等 postinstall 会从 GitHub 下载二进制
+# （国内服务器访问失败）；浏览器端用 WASM 版，无需 Node 原生二进制
+RUN npm ci --registry=https://registry.npmmirror.com --no-audit --no-fund --ignore-scripts
 COPY . .
 # 部署关键：Next build 会把 env.ts 的校验结果（env 值）固化进 server bundle，
 # 构建期必须提供真实、无转义歧义的 env 值。经 ARG/ENV 字面传递，
