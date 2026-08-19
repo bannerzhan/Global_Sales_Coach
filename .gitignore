@@ -55,3 +55,6 @@ build_err.txt
 
 # local JSON fallback storage (used when PostgreSQL is unavailable in dev)
 .local-data/
+
+# 自签证书（服务器生成，勿提交）
+selfsigned/

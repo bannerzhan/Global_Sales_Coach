@@ -1,5 +1,6 @@
 # ============================================================
 # 自签 HTTPS（V0.2 语音功能需要 secure context 才能录音）
+# 证书：服务器生成 IP SAN 自签证书（./selfsigned/，已 gitignore）
 # 访问: https://82.157.183.237:3443 （首次浏览器点「高级→继续访问」）
 # 备案完成后切 Route A（Caddy 自动申请 Let's Encrypt 证书，无需此文件）
 # ============================================================
@@ -8,6 +9,6 @@
 }
 
 :443 {
-	tls internal
+	tls /etc/caddy/selfsigned.crt /etc/caddy/selfsigned.key
 	reverse_proxy app:3000
 }

@@ -81,6 +81,9 @@ services:
       - "3443:443"
     volumes:
       - ./Caddyfile.selfsigned:/etc/caddy/Caddyfile:ro
+      # 自签证书（服务器生成，见 deploy 说明；勿提交仓库）
+      - ./selfsigned/selfsigned.crt:/etc/caddy/selfsigned.crt:ro
+      - ./selfsigned/selfsigned.key:/etc/caddy/selfsigned.key:ro
       - gsc_caddy_data:/data
       - gsc_caddy_config:/config
 
