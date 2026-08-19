@@ -3,8 +3,8 @@
 import { useRef, useState } from "react";
 
 /**
- * 语音播放按钮：TTS 合成 AI 回复并播放（mp3 data URL）。
- * 点击播放 / 再点停止；HTTP（非 secure context）下也允许（播放不受限，仅录音受限）。
+ * AI 回复朗读：优先浏览器原生 TTS（speechSynthesis，免费无 key 国内可用），
+ * 失败/不可用时回退服务端火山 TTS（/api/voice/tts，需 VOICE_API_KEY）。
  */
 export function VoicePlayButton({ text, disabled }: { text: string; disabled?: boolean }) {
   const [playing, setPlaying] = useState(false);
@@ -12,14 +12,42 @@ export function VoicePlayButton({ text, disabled }: { text: string; disabled?: b
   const [error, setError] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  /** 原生 TTS；返回 false 表示不可用 */
+  function speakNative(): boolean {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const isZh = /[\u4e00-\u9fff]/.test(text);
+    const voices = synth.getVoices();
+    const v =
+      voices.find((x) => x.lang.toLowerCase().startsWith(isZh ? "zh" : "en")) ??
+      voices.find((x) => x.lang.toLowerCase().startsWith(isZh ? "en" : "zh")) ??
+      voices[0];
+    if (v) u.voice = v;
+    u.rate = 0.95;
+    u.onend = () => setPlaying(false);
+    u.onerror = () => setPlaying(false);
+    synth.speak(u);
+    return true;
+  }
+
   async function toggle() {
     setError("");
     if (playing) {
+      window.speechSynthesis?.cancel();
       audioRef.current?.pause();
       setPlaying(false);
       return;
     }
     if (disabled || busy) return;
+
+    // 1) 原生 TTS（立即可用）
+    if (speakNative()) {
+      setPlaying(true);
+      return;
+    }
+    // 2) 服务端火山 TTS（配置了 VOICE_API_KEY 时）
     setBusy(true);
     try {
       const res = await fetch("/api/voice/tts", {

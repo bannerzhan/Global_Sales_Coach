@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "bcryptjs": "^3.0.3",
     "next": "16.3.1",
     "next-auth": "^5.0.0-beta.32",
