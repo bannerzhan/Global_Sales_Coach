@@ -8,11 +8,14 @@ import { getOrCreateUserId, isDbAvailable, LOCAL_USER_ID, localGetUser, localSav
  */
 
 function rowToGoal(row: Record<string, unknown>, userId: string): Goal {
+  // pg-node 把 timestamp 默认解析成 Date 对象（不是 string），直接渲染会炸 React
+  const td = row.target_date;
   return {
     id: row.id as string,
     userId,
     title: row.title as string,
-    targetDate: (row.target_date as string | null) ?? null,
+    targetDate:
+      td == null ? null : td instanceof Date ? td.toISOString().slice(0, 10) : String(td),
     status: (row.status as Goal["status"]) ?? "active",
     createdAt: new Date((row.created_at as string) ?? Date.now()).toISOString(),
   };

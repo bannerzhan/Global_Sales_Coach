@@ -263,18 +263,20 @@ async function computeScopeSpend(
         : `date_trunc('day', now())`;
 
   let where = "";
-  const params: unknown[] = [scope];
+  // 只 push 真正用到的参数，占位符从 $1 开始（global 分支无参数，避免
+  // pg "bind message supplies 1 parameters, but prepared statement requires 0"）
+  const params: unknown[] = [];
   if (scope === "global") {
     where = `1=1`;
   } else if (scope === "session") {
-    where = `session_id = $2`;
+    where = `session_id = $1`;
     params.push(opts.sessionId ?? "");
   } else if (opts.userId == null) {
     // user_daily 在单用户应用 + 无 userId 调用（如 /api/health）下没意义，
-    // 直接跳过本次（避免 $2=null 触发 pg "could not determine data type"）
+    // 直接跳过本次（避免 $1=null 触发 pg "could not determine data type"）
     return { usedYuan: 0, limitYuan: cfg.limitYuan, alertYuan: cfg.alertYuan, action: cfg.action };
   } else {
-    where = `user_id = $2`;
+    where = `user_id = $1`;
     params.push(opts.userId);
   }
 
