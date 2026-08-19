@@ -7,6 +7,12 @@ import { env } from "../env";
 const ASR_URL = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash";
 const TTS_URL = "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional";
 
+// 语音 key 等走运行时 process.env 优先（Next build 会固化 env.ts 值，
+// 动态读取让部署后改 key 只重启容器、不必 rebuild）
+function voiceEnv(key: keyof typeof env) {
+  return process.env[key] ?? env[key];
+}
+
 export interface AsrResult {
   ok: boolean;
   text?: string;
@@ -15,14 +21,14 @@ export interface AsrResult {
 
 /** 语音 → 文字（base64 音频，16k 单声道 wav 最佳；极速版支持多种格式） */
 export async function asr(audioBase64: string, format = "wav"): Promise<AsrResult> {
-  const key = env.VOICE_API_KEY;
+  const key = voiceEnv('VOICE_API_KEY');
   if (!key) return { ok: false, error: "语音服务未配置（VOICE_API_KEY）" };
   try {
     const res = await fetch(ASR_URL, {
       method: "POST",
       headers: {
         "X-Api-Key": key,
-        "X-Api-Resource-Id": env.VOICE_ASR_RESOURCE_ID,
+        "X-Api-Resource-Id": voiceEnv('VOICE_ASR_RESOURCE_ID'),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -54,7 +60,7 @@ export interface TtsResult {
 
 /** 文字 → 语音（mp3 base64；音色由 VOICE_TTS_SPEAKER 控制） */
 export async function tts(text: string): Promise<TtsResult> {
-  const key = env.VOICE_API_KEY;
+  const key = voiceEnv('VOICE_API_KEY');
   if (!key) return { ok: false, error: "语音服务未配置（VOICE_API_KEY）" };
   if (!text.trim()) return { ok: false, error: "文本为空" };
   try {
@@ -62,13 +68,13 @@ export async function tts(text: string): Promise<TtsResult> {
       method: "POST",
       headers: {
         "X-Api-Key": key,
-        "X-Api-Resource-Id": env.VOICE_TTS_RESOURCE_ID,
+        "X-Api-Resource-Id": voiceEnv('VOICE_TTS_RESOURCE_ID'),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         req_params: {
           text,
-          speaker: env.VOICE_TTS_SPEAKER,
+          speaker: voiceEnv('VOICE_TTS_SPEAKER'),
           audio_params: { format: "mp3", sample_rate: 24000 },
         },
       }),

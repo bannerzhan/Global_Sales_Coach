@@ -1,10 +1,11 @@
 # ============================================================
-# Route C 部署：自用、IP 直连、明文 HTTP（无域名/无备案/无 HTTPS）
+# Route C 部署：IP 直连，HTTP(:3000) + 自签 HTTPS(:3443，语音用)
 # 用法（服务器上）:
 #   docker compose -f docker-compose.routec.yml up -d --build
-# 访问: http://<服务器公网IP>:3000
-# 说明: 不含 caddy / 自动 HTTPS，因此 PWA 不可安装，但功能完整。
-#       备案完成、绑域名后，改用 docker-compose.yml + deploy.sh <域名> 即可切 HTTPS。
+# 访问:
+#   http://82.157.183.237:3000   （明文，功能完整）
+#   https://82.157.183.237:3443  （自签 HTTPS，语音录音需要；首次点「高级→继续访问」）
+# 说明: 备案完成、绑域名后，改用 docker-compose.yml + deploy.sh <域名> 切自动 HTTPS。
 # 注意: AUTH_USER_PASSWORD_HASH 在 .env 中必须写成 $$2b$$10$$...（compose 转义规则，
 #       compose 插值后容器得到 $2b$10$...）；build 阶段经 build.args 直传（见 Dockerfile）。
 # ============================================================
@@ -42,6 +43,7 @@ services:
         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gsc_dev_password}
         AUTH_URL: ${AUTH_URL:-http://82.157.183.237:3000}
         DATABASE_URL: postgresql://gsc:${POSTGRES_PASSWORD:-gsc_dev_password}@db:5432/gsc
+        INVITE_CODE: ${INVITE_CODE:-gsc-invite-2026}
     container_name: gsc-app
     restart: unless-stopped
     depends_on:
@@ -60,8 +62,29 @@ services:
       AUTH_USER_EMAIL: ${AUTH_USER_EMAIL:?请在 .env 中设置 AUTH_USER_EMAIL}
       AUTH_USER_PASSWORD_HASH: ${AUTH_USER_PASSWORD_HASH:?请在 .env 中设置 AUTH_USER_PASSWORD_HASH}
       AUTH_URL: ${AUTH_URL:-http://82.157.183.237:3000}
+      # 运行时动态读取（voice.ts / register action 走 process.env 优先，免 rebuild 改配置）
+      INVITE_CODE: ${INVITE_CODE:-gsc-invite-2026}
+      VOICE_API_KEY: ${VOICE_API_KEY:-}
+      VOICE_ASR_RESOURCE_ID: ${VOICE_ASR_RESOURCE_ID:-volc.bigasr.auc_turbo}
+      VOICE_TTS_RESOURCE_ID: ${VOICE_TTS_RESOURCE_ID:-seed-tts-2.0}
+      VOICE_TTS_SPEAKER: ${VOICE_TTS_SPEAKER:-zh_female_gaolengyujie_uranus_bigtts}
     ports:
       - "3000:3000"
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: gsc-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "3443:443"
+    volumes:
+      - ./Caddyfile.selfsigned:/etc/caddy/Caddyfile:ro
+      - gsc_caddy_data:/data
+      - gsc_caddy_config:/config
+
 volumes:
   gsc_pgdata:
+  gsc_caddy_data:
+  gsc_caddy_config:

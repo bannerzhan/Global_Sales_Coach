@@ -28,10 +28,12 @@ export async function register(input: {
   if (!input.password || input.password.length < 8) {
     return { ok: false, error: "密码至少 8 位" };
   }
-  if (!env.INVITE_CODE) {
+  // process.env 优先（Next build 会固化 env.ts 值；运行时改邀请码只重启容器即可）
+  const inviteCode = process.env.INVITE_CODE ?? env.INVITE_CODE;
+  if (!inviteCode) {
     return { ok: false, error: "注册已关闭" };
   }
-  if (input.inviteCode.trim() !== env.INVITE_CODE) {
+  if (input.inviteCode.trim() !== inviteCode) {
     return { ok: false, error: "邀请码错误" };
   }
   if (!(await isDbAvailable())) {
