@@ -5,6 +5,8 @@
 # 访问: http://<服务器公网IP>:3000
 # 说明: 不含 caddy / 自动 HTTPS，因此 PWA 不可安装，但功能完整。
 #       备案完成、绑域名后，改用 docker-compose.yml + deploy.sh <域名> 即可切 HTTPS。
+# 注意: AUTH_USER_PASSWORD_HASH 在 .env 中必须写成 $$2b$$10$$...（compose 转义规则，
+#       compose 插值后容器得到 $2b$10$...）；build 阶段经 build.args 直传（见 Dockerfile）。
 # ============================================================
 services:
   db:
@@ -25,7 +27,21 @@ services:
       retries: 10
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        ARK_API_KEY: ${ARK_API_KEY:?请在 .env 中设置 ARK_API_KEY}
+        ARK_BASE_URL: ${ARK_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}
+        ARK_ENDPOINT_PRO: ${ARK_ENDPOINT_PRO:?请在 .env 中设置 ARK_ENDPOINT_PRO}
+        ARK_ENDPOINT_TURBO: ${ARK_ENDPOINT_TURBO:?请在 .env 中设置 ARK_ENDPOINT_TURBO}
+        ARK_ENDPOINT_FLASH: ${ARK_ENDPOINT_FLASH:?请在 .env 中设置 ARK_ENDPOINT_FLASH}
+        ARK_MODEL_FLASH: ${ARK_MODEL_FLASH:-deepseek-v4-flash}
+        AUTH_SECRET: ${AUTH_SECRET:?请在 .env 中设置 AUTH_SECRET}
+        AUTH_USER_EMAIL: ${AUTH_USER_EMAIL:?请在 .env 中设置 AUTH_USER_EMAIL}
+        AUTH_USER_PASSWORD_HASH: ${AUTH_USER_PASSWORD_HASH:?请在 .env 中设置 AUTH_USER_PASSWORD_HASH}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gsc_dev_password}
+        AUTH_URL: ${AUTH_URL:-http://82.157.183.237:3000}
+        DATABASE_URL: postgresql://gsc:${POSTGRES_PASSWORD:-gsc_dev_password}@db:5432/gsc
     container_name: gsc-app
     restart: unless-stopped
     depends_on:
