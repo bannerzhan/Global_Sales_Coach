@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 
 /**
@@ -96,6 +97,15 @@ export function LoginForm() {
       >
         {isPending ? "登录中…" : "登录"}
       </button>
+      <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+        还没有账号？
+        <Link
+          href="/register"
+          className="font-medium text-teal-600 hover:underline dark:text-teal-400"
+        >
+          注册一个
+        </Link>
+      </p>
     </form>
   );
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { saveProfile, getProfile } from "@/lib/repo/profile";
 import { addGoal } from "@/lib/repo/goal";
 import type { Profile } from "@/lib/repo/types";
@@ -10,7 +11,7 @@ import { saveBaseline } from "@/lib/repo/assessment";
 
 /**
  * Onboarding server actions。
- * 单用户：userId 固定 LOCAL_USER_ID（storage 内部解析）。
+ * 多用户：userId 取自当前 session（proxy 已拦未登录）。
  */
 
 export interface OnboardingInput {
@@ -20,9 +21,10 @@ export interface OnboardingInput {
 
 /** 保存画像 + 目标，完成 Onboarding → 回首页 */
 export async function completeOnboarding(input: OnboardingInput) {
-  const profile = await saveProfile(input.profile);
+  const uid = (await auth())?.user?.id;
+  await saveProfile(input.profile, uid);
   for (const g of input.goals) {
-    if (g.title.trim()) await addGoal({ title: g.title.trim(), targetDate: g.targetDate });
+    if (g.title.trim()) await addGoal({ title: g.title.trim(), targetDate: g.targetDate }, uid);
   }
   redirect("/");
 }
@@ -46,7 +48,7 @@ export async function suggestGoalsAction(profile: Omit<Profile, "userId" | "upda
 
 /** 供首页/其他页查询当前画像 */
 export async function getCurrentProfile(): Promise<Profile | null> {
-  return getProfile();
+  return getProfile((await auth())?.user?.id);
 }
 
 /** 合并提交：保存画像 + 目标 + 跑基线评估并落库 → 回首页 */
@@ -56,9 +58,10 @@ export async function submitOnboarding(input: {
   selfRatings: Record<AssessmentDimension, number>;
   context?: string;
 }) {
-  const profile = await saveProfile(input.profile);
+  const uid = (await auth())?.user?.id;
+  const profile = await saveProfile(input.profile, uid);
   for (const g of input.goals) {
-    if (g.title.trim()) await addGoal({ title: g.title.trim(), targetDate: g.targetDate });
+    if (g.title.trim()) await addGoal({ title: g.title.trim(), targetDate: g.targetDate }, uid);
   }
   // 基线评估（失败不阻断：降级为自评基线，保证流程可完成）
   const assessment = await runAssessment({
@@ -68,11 +71,14 @@ export async function submitOnboarding(input: {
     locale: profile.locale,
   });
   if (assessment.ok && assessment.data) {
-    await saveBaseline({
-      dimensionScores: assessment.data.dimensionScores,
-      overallSummary: assessment.data.overallSummary,
-      selfRatings: input.selfRatings,
-    });
+    await saveBaseline(
+      {
+        dimensionScores: assessment.data.dimensionScores,
+        overallSummary: assessment.data.overallSummary,
+        selfRatings: input.selfRatings,
+      },
+      uid,
+    );
   }
   redirect("/");
 }
@@ -82,7 +88,8 @@ export async function submitAssessment(input: {
   selfRatings: Record<AssessmentDimension, number>;
   context?: string;
 }) {
-  const profile = await getProfile();
+  const uid = (await auth())?.user?.id;
+  const profile = await getProfile(uid);
   const assessment = await runAssessment({
     profile,
     selfRatings: input.selfRatings,
@@ -90,11 +97,14 @@ export async function submitAssessment(input: {
     locale: profile?.locale,
   });
   if (assessment.ok && assessment.data) {
-    await saveBaseline({
-      dimensionScores: assessment.data.dimensionScores,
-      overallSummary: assessment.data.overallSummary,
-      selfRatings: input.selfRatings,
-    });
+    await saveBaseline(
+      {
+        dimensionScores: assessment.data.dimensionScores,
+        overallSummary: assessment.data.overallSummary,
+        selfRatings: input.selfRatings,
+      },
+      uid,
+    );
   }
   redirect("/");
 }
@@ -102,7 +112,8 @@ export async function submitAssessment(input: {
 /** 切换演练语言（首页开关用）："zh-CN" | "en" */
 export async function setLocale(locale: string) {
   const normalized = locale === "en" ? "en" : "zh-CN";
-  const profile = await getProfile();
+  const uid = (await auth())?.user?.id;
+  const profile = await getProfile(uid);
   if (!profile) return;
-  await saveProfile({ ...profile, locale: normalized });
+  await saveProfile({ ...profile, locale: normalized }, uid);
 }

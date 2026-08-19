@@ -21,29 +21,32 @@ export interface BaselineAssessment {
   createdAt: string;
 }
 
-export async function saveBaseline(input: {
-  dimensionScores: DimensionScore[];
-  overallSummary: string;
-  selfRatings?: Record<string, number> | null;
-}): Promise<BaselineAssessment> {
+export async function saveBaseline(
+  input: {
+    dimensionScores: DimensionScore[];
+    overallSummary: string;
+    selfRatings?: Record<string, number> | null;
+  },
+  userId?: string,
+): Promise<BaselineAssessment> {
   const dbOk = await isDbAvailable();
   const createdAt = new Date().toISOString();
 
   if (dbOk) {
-    const userId = await getOrCreateUserId();
+    const uid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query<{ id: string; created_at: string }>(
       `INSERT INTO assessments (user_id, dimension_scores, overall_summary, self_ratings)
        VALUES ($1,$2,$3,$4)
        RETURNING id, created_at`,
       [
-        userId,
+        uid,
         JSON.stringify(input.dimensionScores),
         input.overallSummary,
         input.selfRatings ? JSON.stringify(input.selfRatings) : null,
       ],
     );
     return {
-      userId,
+      userId: uid,
       dimensionScores: input.dimensionScores,
       overallSummary: input.overallSummary,
       selfRatings: input.selfRatings ?? null,
@@ -64,10 +67,10 @@ export async function saveBaseline(input: {
   return baseline;
 }
 
-export async function getLatestBaseline(): Promise<BaselineAssessment | null> {
+export async function getLatestBaseline(userId?: string): Promise<BaselineAssessment | null> {
   const dbOk = await isDbAvailable();
   if (dbOk) {
-    const userId = await getOrCreateUserId();
+    const uid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query<{
       dimension_scores: DimensionScore[];
       overall_summary: string;
@@ -76,12 +79,12 @@ export async function getLatestBaseline(): Promise<BaselineAssessment | null> {
     }>(
       `SELECT dimension_scores, overall_summary, self_ratings, created_at
        FROM assessments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [userId],
+      [uid],
     );
     if (rows.length === 0) return null;
     const r = rows[0];
     return {
-      userId,
+      userId: uid,
       dimensionScores: r.dimension_scores,
       overallSummary: r.overall_summary,
       selfRatings: r.self_ratings,

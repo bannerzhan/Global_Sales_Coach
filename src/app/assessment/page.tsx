@@ -3,16 +3,18 @@ import { isOnboarded } from "@/lib/repo/profile";
 import { getLatestBaseline } from "@/lib/repo/assessment";
 import { ASSESSMENT_DIM_LABEL } from "@/lib/llm/assessment";
 import { AssessmentForm } from "./form";
+import { auth } from "@/auth";
 
 /**
  * 基线评估页：展示上一次测评结果 + 重新测评入口。
  * 未 Onboarding → 回引导页。
  */
 export default async function AssessmentPage() {
-  const onboarded = await isOnboarded();
+  const uid = (await auth())?.user?.id;
+  const onboarded = await isOnboarded(uid);
   if (!onboarded) redirect("/onboarding");
 
-  const baseline = await getLatestBaseline();
+  const baseline = await getLatestBaseline(uid);
 
   return (
     <main className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">

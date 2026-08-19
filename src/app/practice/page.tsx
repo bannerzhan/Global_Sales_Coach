@@ -4,6 +4,7 @@ import { getScenario } from "@/lib/repo/scenario";
 import { listSkillStates } from "@/lib/repo/skill-state";
 import { skillById, DIMENSION_LABEL } from "@/lib/repo/skills";
 import { CreatePracticeButton } from "./create-practice-button";
+import { auth } from "@/auth";
 
 /**
  * 演练入口页：新建演练（基于学习目标生成场景）+ 进行中的演练 + 技能概览。
@@ -14,9 +15,10 @@ export default async function PracticePage({
 }: {
   searchParams: Promise<{ focus?: string | string[] }>;
 }) {
-  const goals = await listGoals();
-  const active = await listActiveSessions();
-  const states = await listSkillStates();
+  const uid = (await auth())?.user?.id;
+  const goals = await listGoals(uid);
+  const active = await listActiveSessions(uid);
+  const states = await listSkillStates(uid);
 
   const rawFocus = (await searchParams).focus;
   const focusId = Array.isArray(rawFocus) ? rawFocus[0] : rawFocus;

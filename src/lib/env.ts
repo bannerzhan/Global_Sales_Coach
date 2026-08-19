@@ -33,6 +33,14 @@ const envSchema = z.object({
   AUTH_USER_PASSWORD_HASH: z
     .string()
     .min(20, "AUTH_USER_PASSWORD_HASH 缺失或格式错误"),
+  // 注册邀请码（朋友间邀请；空串 = 关闭注册）
+  INVITE_CODE: z.string().default("gsc-invite-2026"),
+
+  // 火山语音（ASR/TTS，独立产品线 openspeech.bytedance.com，key 与方舟 ARK key 不同）
+  VOICE_API_KEY: z.string().optional(),
+  VOICE_ASR_RESOURCE_ID: z.string().default("volc.bigasr.auc_turbo"),
+  VOICE_TTS_RESOURCE_ID: z.string().default("seed-tts-2.0"),
+  VOICE_TTS_SPEAKER: z.string().default("zh_female_gaolengyujie_uranus_bigtts"),
 });
 
 const parsed = envSchema.safeParse(process.env);

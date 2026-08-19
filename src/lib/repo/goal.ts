@@ -24,7 +24,7 @@ function rowToGoal(row: Record<string, unknown>, userId: string): Goal {
 export async function listGoals(userId?: string): Promise<Goal[]> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM goals WHERE user_id = $1 AND status != 'abandoned' ORDER BY created_at",
       [dbUid],
@@ -41,7 +41,7 @@ export async function addGoal(
 ): Promise<Goal> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       `INSERT INTO goals (user_id, title, target_date, status)
        VALUES ($1, $2, $3, 'active')

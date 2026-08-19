@@ -41,7 +41,7 @@ export async function createRoleplaySession(
   };
 
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       `INSERT INTO roleplay_sessions (id, user_id, scenario_id, status, turns)
        VALUES ($1, $2, $3, 'active', $4)
@@ -63,7 +63,7 @@ export async function getRoleplaySession(
 ): Promise<RoleplaySession | null> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM roleplay_sessions WHERE id = $1 AND user_id = $2",
       [id, dbUid],
@@ -85,7 +85,7 @@ export async function appendTurn(
 
   const updated: RoleplaySession = { ...session, turns: [...session.turns, turn] };
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     await pool.query(
       "UPDATE roleplay_sessions SET turns = $1 WHERE id = $2 AND user_id = $3",
       [JSON.stringify(updated.turns), sessionId, dbUid],
@@ -113,7 +113,7 @@ export async function completeSession(
     endedAt: new Date().toISOString(),
   };
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     await pool.query(
       "UPDATE roleplay_sessions SET status = 'completed', ended_at = now() WHERE id = $1 AND user_id = $2",
       [sessionId, dbUid],
@@ -131,7 +131,7 @@ export async function completeSession(
 export async function listActiveSessions(userId?: string): Promise<RoleplaySession[]> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM roleplay_sessions WHERE user_id = $1 AND status = 'active' ORDER BY started_at DESC",
       [dbUid],
@@ -174,7 +174,7 @@ export async function createAttempt(
   };
 
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       `INSERT INTO attempts
          (id, user_id, scenario_id, task_type, user_input, evaluation, score, is_retry, attempt_no)
@@ -204,7 +204,7 @@ export async function createAttempt(
 export async function listAttempts(userId?: string): Promise<Attempt[]> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM attempts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50",
       [dbUid],

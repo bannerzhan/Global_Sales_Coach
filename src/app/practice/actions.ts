@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { getProfile } from "@/lib/repo/profile";
 import { listGoals } from "@/lib/repo/goal";
 import { createScenario, getScenario } from "@/lib/repo/scenario";
@@ -21,13 +22,14 @@ import type { RoleplayTurn } from "@/lib/repo/types";
 
 /**
  * 演练闭环 server actions。
- * 单用户：userId 由 storage 内部解析（LOCAL_USER_ID / email → DB UUID）。
+ * 多用户：userId 取自当前 session（proxy 已拦未登录）。
  */
 
 /** 基于当前第一个 active 目标（或指定聚焦技能）生成场景并开一场演练 */
 export async function createPractice(focusSkillId?: string | null) {
-  const goals = await listGoals();
-  const profile = await getProfile();
+  const uid = (await auth())?.user?.id;
+  const goals = await listGoals(uid);
+  const profile = await getProfile(uid);
 
   // 专项演练：目标标题回退为该技能名
   const focusDef = focusSkillId ? skillById(focusSkillId) : undefined;
@@ -76,7 +78,7 @@ export async function createPractice(focusSkillId?: string | null) {
     pressureStep: 0,
     createdAt: new Date().toISOString(),
   };
-  const session = await createRoleplaySession(scenario.id, openingTurn);
+  const session = await createRoleplaySession(scenario.id, openingTurn, uid);
   redirect(`/practice/${session.id}`);
 }
 
@@ -209,6 +211,6 @@ export async function getLatestReview(sessionId: string): Promise<ReviewOutput |
 async function listAttemptsForScenario(scenarioId: string) {
   // 延迟 require 避免循环依赖（actions 只在这一处用）
   const { listAttempts } = await import("@/lib/repo/attempt");
-  const all = await listAttempts();
+  const all = await listAttempts((await auth())?.user?.id);
   return all.filter((a) => a.scenarioId === scenarioId);
 }

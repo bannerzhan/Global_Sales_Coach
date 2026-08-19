@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { isOnboarded } from "@/lib/repo/profile";
 import { OnboardingWizard } from "./wizard";
+import { auth } from "@/auth";
 
 /**
  * Onboarding 引导页（登录后访问；proxy.ts 已挡未登录）。
  * 已完成引导 → 直接回首页；否则渲染多步引导。
  */
 export default async function OnboardingPage() {
-  const onboarded = await isOnboarded();
+  const onboarded = await isOnboarded((await auth())?.user?.id);
   if (onboarded) redirect("/");
 
   return (

@@ -25,7 +25,7 @@ function rowToProfile(row: Record<string, unknown>, userId: string): Profile {
 export async function getProfile(userId?: string): Promise<Profile | null> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query("SELECT * FROM profiles WHERE user_id = $1", [dbUid]);
     return rows[0] ? rowToProfile(rows[0], dbUid) : null;
   }
@@ -41,7 +41,7 @@ export async function saveProfile(
 ): Promise<Profile> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       `INSERT INTO profiles
          (user_id, occupation, industry, markets, channels, daily_minutes, english_level, locale, timezone)

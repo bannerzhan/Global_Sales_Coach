@@ -17,15 +17,16 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 export default async function HomePage() {
   const session = await auth();
   const email = session?.user?.email ?? "coach";
+  const uid = session?.user?.id;
 
-  const onboarded = await isOnboarded();
+  const onboarded = await isOnboarded(uid);
   if (!onboarded) redirect("/onboarding");
 
-  const profile = await getProfile();
-  const goals = await listGoals();
-  const due = await dueSkillStates();
-  const states = await listSkillStates();
-  const baseline = await getLatestBaseline();
+  const profile = await getProfile(uid);
+  const goals = await listGoals(uid);
+  const due = await dueSkillStates(uid);
+  const states = await listSkillStates(uid);
+  const baseline = await getLatestBaseline(uid);
 
   return (
     <main className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">

@@ -16,7 +16,7 @@ const STATES_KEY = "skillStates";
 export async function getSkillState(skillId: string, userId?: string): Promise<SkillState | null> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM skill_states WHERE user_id = $1 AND skill_id = $2",
       [dbUid, skillId],
@@ -31,7 +31,7 @@ export async function getSkillState(skillId: string, userId?: string): Promise<S
 export async function listSkillStates(userId?: string): Promise<SkillState[]> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM skill_states WHERE user_id = $1 ORDER BY mastery DESC",
       [dbUid],
@@ -110,7 +110,7 @@ function rowToState(row: Record<string, unknown>, userId: string): SkillState {
 async function upsertState(state: SkillState, userId?: string): Promise<void> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = await getOrCreateUserId();
+    const dbUid = userId ?? (await getOrCreateUserId());
     await pool.query(
       `INSERT INTO skill_states
          (user_id, skill_id, mastery, stability, difficulty, reps, lapses, last_review, next_review)
