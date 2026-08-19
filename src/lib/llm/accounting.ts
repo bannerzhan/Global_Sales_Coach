@@ -269,9 +269,13 @@ async function computeScopeSpend(
   } else if (scope === "session") {
     where = `session_id = $2`;
     params.push(opts.sessionId ?? "");
+  } else if (opts.userId == null) {
+    // user_daily 在单用户应用 + 无 userId 调用（如 /api/health）下没意义，
+    // 直接跳过本次（避免 $2=null 触发 pg "could not determine data type"）
+    return { usedYuan: 0, limitYuan: cfg.limitYuan, alertYuan: cfg.alertYuan, action: cfg.action };
   } else {
     where = `user_id = $2`;
-    params.push(opts.userId ?? null);
+    params.push(opts.userId);
   }
 
   const sumRes = await pool.query<{ total: string }>(
@@ -418,7 +422,8 @@ async function recentAlertsList(): Promise<{ scope: string; level: string; usedY
       scope: r.scope,
       level: r.level,
       usedYuan: Number(r.used_yuan),
-      createdAt: r.created_at,
+      // pg-node 默认把 created_at 解析成 JS Date 对象，渲染会炸 React
+      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
     }));
   } catch {
     return [];
