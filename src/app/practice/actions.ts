@@ -198,26 +198,29 @@ export async function retryReview(sessionId: string): Promise<{ ok: boolean; err
       evaluation: { review: review.data, degraded: review.degraded ?? false },
       score: review.data.score,
       isRetry: false,
-    attemptNo: 1,
-  });
-  await applySkillUpdates(review.data.skillUpdates);
+      attemptNo: 1,
+    },
+    uid,
+  );
+  await applySkillUpdates(review.data.skillUpdates, uid);
   return { ok: true };
 }
 
 /** 复盘页读取最近一次复盘结果 */
 export async function getLatestReview(sessionId: string): Promise<ReviewOutput | null> {
-  const session = await getRoleplaySession(sessionId);
+  const uid = (await auth())?.user?.id;
+  const session = await getRoleplaySession(sessionId, uid);
   if (!session) return null;
-  const attempts = await listAttemptsForScenario(session.scenarioId);
+  const attempts = await listAttemptsForScenario(session.scenarioId, uid);
   const withReview = attempts.find(
     (a) => a.evaluation && (a.evaluation as { review?: unknown }).review,
   );
   return withReview ? ((withReview.evaluation as { review: ReviewOutput }).review ?? null) : null;
 }
 
-async function listAttemptsForScenario(scenarioId: string) {
+async function listAttemptsForScenario(scenarioId: string, userId?: string) {
   // 延迟 require 避免循环依赖（actions 只在这一处用）
   const { listAttempts } = await import("@/lib/repo/attempt");
-  const all = await listAttempts((await auth())?.user?.id);
+  const all = await listAttempts(userId);
   return all.filter((a) => a.scenarioId === scenarioId);
 }
