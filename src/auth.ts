@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { env } from "@/lib/env";
 import { pool } from "@/lib/db";
-import { isDbAvailable } from "@/lib/repo/storage";
+import { isDbAvailable, LOCAL_USER_ID } from "@/lib/repo/storage";
 
 /**
  * Auth.js v5 多用户 Credentials 登录。
@@ -76,8 +76,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   callbacks: {
     // proxy 守卫：无 session 一律拒绝（会重定向到 pages.signIn）
-    authorized({ auth: session }) {
-      return !!session?.user;
+    // V0.1 旧本地 session 的 id 是 "1"，V0.2 DB 多用户模式下当 UUID 会 500，强制重新登录
+    async authorized({ auth: session }) {
+      if (!session?.user) return false;
+      if (session.user.id === LOCAL_USER_ID && (await isDbAvailable())) {
+        return false;
+      }
+      return true;
     },
     jwt({ token, user }) {
       if (user) token.sub = user.id;

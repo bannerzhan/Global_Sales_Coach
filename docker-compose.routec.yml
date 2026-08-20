@@ -41,7 +41,7 @@ services:
         AUTH_USER_EMAIL: ${AUTH_USER_EMAIL:?请在 .env 中设置 AUTH_USER_EMAIL}
         AUTH_USER_PASSWORD_HASH: ${AUTH_USER_PASSWORD_HASH:?请在 .env 中设置 AUTH_USER_PASSWORD_HASH}
         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gsc_dev_password}
-        AUTH_URL: ${AUTH_URL:-http://82.157.183.237:3000}
+        AUTH_URL: ${AUTH_URL:-https://82.157.183.237:3443}
         DATABASE_URL: postgresql://gsc:${POSTGRES_PASSWORD:-gsc_dev_password}@db:5432/gsc
         INVITE_CODE: ${INVITE_CODE:-gsc-invite-2026}
     container_name: gsc-app
@@ -61,7 +61,7 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?请在 .env 中设置 AUTH_SECRET}
       AUTH_USER_EMAIL: ${AUTH_USER_EMAIL:?请在 .env 中设置 AUTH_USER_EMAIL}
       AUTH_USER_PASSWORD_HASH: ${AUTH_USER_PASSWORD_HASH:?请在 .env 中设置 AUTH_USER_PASSWORD_HASH}
-      AUTH_URL: ${AUTH_URL:-http://82.157.183.237:3000}
+      AUTH_URL: ${AUTH_URL:-https://82.157.183.237:3443}
       # 运行时动态读取（voice.ts / register action 走 process.env 优先，免 rebuild 改配置）
       INVITE_CODE: ${INVITE_CODE:-gsc-invite-2026}
       VOICE_API_KEY: ${VOICE_API_KEY:-}
