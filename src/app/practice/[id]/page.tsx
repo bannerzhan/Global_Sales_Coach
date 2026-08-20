@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getRoleplaySession } from "@/lib/repo/attempt";
 import { getScenario } from "@/lib/repo/scenario";
+import { auth } from "@/auth";
 import { ChatView } from "./chat";
 
 /**
@@ -12,7 +13,8 @@ export default async function PracticeSessionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getRoleplaySession(id);
+  const uid = (await auth())?.user?.id;
+  const session = await getRoleplaySession(id, uid);
   if (!session) notFound();
 
   const scenario = await getScenario(session.scenarioId);

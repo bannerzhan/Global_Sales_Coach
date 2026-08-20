@@ -63,7 +63,9 @@ export async function getRoleplaySession(
 ): Promise<RoleplaySession | null> {
   const uid = userId ?? LOCAL_USER_ID;
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
+    // DB 模式必须显式传 userId；不传则用本地占位 id（必然查不到），
+    // 避免 fallback 到 admin 用户导致误读他人演练数据
+    const dbUid = userId ?? LOCAL_USER_ID;
     const { rows } = await pool.query(
       "SELECT * FROM roleplay_sessions WHERE id = $1 AND user_id = $2",
       [id, dbUid],
