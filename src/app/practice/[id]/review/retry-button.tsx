@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { retryReview } from "../../actions";
 
 /** 复盘重试按钮：失败时重新跑一次 AI 点评 */
-export function ReviewRetryButton({ sessionId }: { sessionId: string }) {
+export function ReviewRetryButton({
+  sessionId,
+  className = "w-full",
+}: {
+  sessionId: string;
+  className?: string;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +38,7 @@ export function ReviewRetryButton({ sessionId }: { sessionId: string }) {
         type="button"
         onClick={onClick}
         disabled={isPending}
-        className="h-11 w-full rounded-lg bg-teal-600 font-semibold text-white shadow-sm transition hover:bg-teal-700 disabled:opacity-60"
+        className={`h-11 rounded-lg bg-teal-600 px-4 font-semibold text-white shadow-sm transition hover:bg-teal-700 disabled:opacity-60 ${className}`}
       >
         {isPending ? "AI 正在复盘…" : "重新复盘"}
       </button>

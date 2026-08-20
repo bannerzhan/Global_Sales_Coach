@@ -46,9 +46,31 @@ export const ReviewSchema = z.object({
     )
     .min(1, "至少 1 个技能更新")
     .max(4),
+  // 核心：逐句解剖客户话术（用户认为单纯评分表没用）
+  customerSentenceAnalysis: z
+    .array(
+      z.object({
+        turnIndex: z.number().int().min(0).describe("该客户话术在对话中的轮次序号"),
+        customerQuote: z.string().min(1, "必须引用客户原话"),
+        intent: z.string().min(2, "说明客户这句话的意图"),
+        negotiationAngle: z
+          .string()
+          .min(2, "给出一个谈判角度标签，如「价格施压」「拖延观望」「异议拒绝」等"),
+        userResponse: z.string().describe("销售当时的回应原话"),
+        assessment: z.string().min(2, "点评用户回应好在哪里/差在哪里，要具体"),
+        betterResponse: z.string().min(2, "给出更优回应示例"),
+        keyTakeaway: z.string().min(2, "一句话 takeaway"),
+      }),
+    )
+    .max(12)
+    .describe(
+      "逐条分析客户（买家）的每一句话/每一条消息：意图、谈判角度、用户回应点评、更优回应示例。这是复盘最重要的部分。",
+    ),
+  // 保留旧字段兼容旧数据
   turnFeedback: z
     .array(z.object({ turnIndex: z.number().int().min(0), comment: z.string() }))
-    .max(8),
+    .max(8)
+    .optional(),
 });
 export type ReviewOutput = z.infer<typeof ReviewSchema>;
 
@@ -102,7 +124,7 @@ export async function reviewSession(input: ReviewInput): Promise<{
       toolDescription: "对销售演练对话输出结构化复盘",
       schema: ReviewSchema,
       maxRetries: 1,
-      maxTokens: 2048,
+      maxTokens: 4096,
       userId: input.userId,
       sessionId: input.sessionId,
       fallback: () => ({
@@ -127,14 +149,28 @@ export async function reviewSession(input: ReviewInput): Promise<{
           delta: 0.05,
           note: fb("完成演练，小幅进步", "Finished the drill, slight progress"),
         })),
+        customerSentenceAnalysis: [],
         turnFeedback: [],
       }),
       system:
-        "你是 Global Sales Coach 的首席销售教练，对刚结束的一场角色扮演演练做复盘。\n" +
+        "你是 Global Sales Coach 的首席销售教练，对刚结束的一场 B2B 外贸角色扮演演练做深度复盘。\n" +
         "【行为准则（固定，不可改）】\n" +
         "1. 只用下方对话与已知信息，绝不虚构用户的公司、行业、客户、订单、金额等事实。\n" +
         "2. 语言反馈与商业建议严格区分：可纠正表达错误；绝不编造 Incoterms / 支付条款 / 法律 / 税务 / 关税规则。涉及外部商业规则时只在 feedbackBusiness 里标注「建议核实」并给官方渠道，不替模型编数字。\n" +
-        "输出要求：\n" +
+        "【复盘重点：逐句解剖客户话术】\n" +
+        "用户认为单纯评分表没有帮助。请把重心放在 customerSentenceAnalysis 上：对**客户的每一句话/每一条消息**做如下拆解（最多 12 条）：\n" +
+        "- customerQuote：引用客户原话（简短准确）\n" +
+        "- intent：客户说这句话的真实意图是什么\n" +
+        "- negotiationAngle：给出一个谈判角度标签，优先从以下标签选，也可自定义相近标签：" +
+        fb(
+          "价格施压、比价压价、拖延观望、异议拒绝、需求确认、购买信号、权限限制（需请示上级）、风险/合规担忧、试探底线、建立关系、模糊询价",
+          "price pressure, comparison, stalling, objection, needs confirmation, buying signal, authority limit, risk/compliance concern, probing bottom line, relationship building, vague inquiry",
+        ) + "\n" +
+        "- userResponse：销售当时回应的原话\n" +
+        "- assessment：具体点评这次回应——好在哪里、差在哪里、 missed 了什么机会\n" +
+        "- betterResponse：给一句/一段**更优的回应示例**，可直接套用，要符合外贸场景和对话上下文\n" +
+        "- keyTakeaway：一句话 takeaway\n" +
+        "【评分与建议（次要但保留）】\n" +
         "1. score 是 0-10 的总分，反映整体销售表现\n" +
         "2. dimensionScores 固定评 3 个维度：" +
         dimList + "\n" +
@@ -144,8 +180,7 @@ export async function reviewSession(input: ReviewInput): Promise<{
         "6. feedbackBusiness：涉及商业规则时的核实提示；没有则给空数组 []\n" +
         "7. skillUpdates 从以下技能池选 1-4 个，delta 表示掌握度增减（-0.3~+0.3）：\n" +
         `   ${skillPool}\n` +
-        "8. turnFeedback 挑 0-8 个关键轮次给逐轮点评（turnIndex 对应对话序号）\n" +
-        "9. " + outputLangLine(lang),
+        "8. " + outputLangLine(lang),
     },
     [
       {

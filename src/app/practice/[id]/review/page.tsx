@@ -50,114 +50,211 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
       <section className="mx-auto w-full max-w-3xl flex-1 px-5 py-8">
         {review ? (
           <>
-            {/* 总分 */}
-            <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-center dark:border-zinc-800 dark:bg-zinc-900">
-              <div
-                className={`text-5xl font-bold ${
-                  review.score >= 7
-                    ? "text-teal-600"
-                    : review.score >= 4
-                      ? "text-amber-500"
-                      : "text-red-500"
-                }`}
-              >
-                {review.score.toFixed(1)}
-              </div>
-              <div className="mt-1 text-sm text-zinc-400">综合评分 / 10</div>
-              <div className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                {scenario?.title ?? "演练"}
-              </div>
-            </div>
-
-            {/* 维度分 */}
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              {review.dimensionScores.map((d) => (
-                <div
-                  key={d.dimension}
-                  className="rounded-xl border border-zinc-200 bg-white p-4 text-center dark:border-zinc-800 dark:bg-zinc-900"
-                >
-                  <div className="text-2xl font-bold text-zinc-800 dark:text-zinc-100">
-                    {d.score.toFixed(1)}
-                  </div>
-                  <div className="mt-0.5 text-xs text-zinc-400">
-                    {DIM_LABEL[d.dimension] ?? d.dimension}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* 亮点 */}
-            <div className="mt-5 rounded-2xl border border-teal-200 bg-teal-50/60 p-5 dark:border-teal-900 dark:bg-teal-950/30">
-              <h3 className="text-sm font-semibold text-teal-800 dark:text-teal-300">
-                💡 亮点
-              </h3>
-              <ul className="mt-2.5 space-y-2">
-                {review.highlights.map((h, i) => (
-                  <li key={i} className="text-sm leading-relaxed text-teal-900 dark:text-teal-200">
-                    · {h}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* 改进建议 */}
-            <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-              <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                🎯 改进建议
-              </h3>
-              <ul className="mt-2.5 space-y-2">
-                {review.improvements.map((imp, i) => (
-                  <li
-                    key={i}
-                    className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300"
+            {/* 顶部：场景标题 + 小分 + 重试 */}
+            <div className="flex items-start justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="min-w-0">
+                <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                  {scenario?.title ?? "演练复盘"}
+                </h1>
+                <p className="mt-1 text-xs text-zinc-400">
+                  综合评分 {" "}
+                  <span
+                    className={`font-bold ${
+                      review.score >= 7
+                        ? "text-teal-600"
+                        : review.score >= 4
+                          ? "text-amber-500"
+                          : "text-red-500"
+                    }`}
                   >
-                    {i + 1}. {imp}
-                  </li>
-                ))}
-              </ul>
+                    {review.score.toFixed(1)}
+                  </span>{" "}
+                  / 10
+                </p>
+              </div>
+              <div className="shrink-0">
+                <ReviewRetryButton sessionId={id} className="" />
+              </div>
             </div>
 
-            {/* 技能变化 */}
-            <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-              <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                📊 技能掌握度变化
-              </h3>
-              <ul className="mt-2.5 space-y-2">
-                {review.skillUpdates.map((su, i) => {
-                  const def = skillById(su.skillId);
-                  return (
-                    <li key={i} className="flex items-start justify-between gap-3 text-sm">
-                      <span className="text-zinc-700 dark:text-zinc-300">
-                        {def?.name ?? su.skillId}
-                        <span className="ml-1.5 text-xs text-zinc-400">{su.note}</span>
-                      </span>
-                      <span
-                        className={`shrink-0 font-semibold ${
-                          su.delta >= 0 ? "text-teal-600" : "text-red-500"
-                        }`}
-                      >
-                        {su.delta >= 0 ? "+" : ""}
-                        {(su.delta * 100).toFixed(0)}%
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+            {/* 核心：逐句客户话术解剖 */}
+            {(review.customerSentenceAnalysis ?? []).length > 0 ? (
+              <div className="mt-5 space-y-4">
+                <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                  🔍 客户每句话拆解
+                </h2>
+                {[...(review.customerSentenceAnalysis ?? [])]
+                  .sort((a, b) => a.turnIndex - b.turnIndex)
+                  .map((item, i) => (
+                    <div
+                      key={i}
+                      className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">
+                          第 {item.turnIndex} 轮
+                        </span>
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                          {item.negotiationAngle}
+                        </span>
+                      </div>
 
-            {/* 逐轮点评 */}
-            {review.turnFeedback.length > 0 && (
-              <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                      <div className="mt-3 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-950">
+                        <div className="text-xs text-zinc-400">客户说</div>
+                        <p className="mt-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+                          “{item.customerQuote}”
+                        </p>
+                      </div>
+
+                      <div className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                        <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                          意图：
+                        </span>
+                        {item.intent}
+                      </div>
+
+                      {item.userResponse && (
+                        <div className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                          <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                            你的回应：
+                          </span>
+                          “{item.userResponse}”
+                        </div>
+                      )}
+
+                      <div className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                        <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                          点评：
+                        </span>
+                        {item.assessment}
+                      </div>
+
+                      <div className="mt-3 rounded-xl border border-teal-100 bg-teal-50/60 p-3 dark:border-teal-900 dark:bg-teal-950/30">
+                        <div className="text-xs font-medium text-teal-700 dark:text-teal-400">
+                          更优回应
+                        </div>
+                        <p className="mt-1 text-sm leading-relaxed text-teal-900 dark:text-teal-200">
+                          {item.betterResponse}
+                        </p>
+                      </div>
+
+                      <div className="mt-3 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                        💡 {item.keyTakeaway}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900 dark:bg-amber-950/30">
+                <h2 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  本次复盘未生成逐句分析
+                </h2>
+                <p className="mt-1 text-sm text-amber-700 dark:text-amber-200">
+                  可能是 AI 输出超时或格式异常。点击下方按钮重新生成，会拿到逐句客户话术解剖。
+                </p>
+                <div className="mt-3 w-full">
+                  <ReviewRetryButton sessionId={id} />
+                </div>
+              </div>
+            )}
+
+            {/* 关键改进建议 */}
+            {review.improvements.length > 0 && (
+              <div className="mt-5 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
                 <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                  💬 逐轮点评
+                  🎯 关键改进建议
                 </h3>
                 <ul className="mt-2.5 space-y-2">
-                  {review.turnFeedback.map((tf, i) => (
+                  {review.improvements.map((imp, i) => (
+                    <li
+                      key={i}
+                      className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300"
+                    >
+                      {i + 1}. {imp}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* 技能变化 */}
+            {review.skillUpdates.length > 0 && (
+              <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                  📊 技能掌握度变化
+                </h3>
+                <ul className="mt-2.5 space-y-2">
+                  {review.skillUpdates.map((su, i) => {
+                    const def = skillById(su.skillId);
+                    return (
+                      <li key={i} className="flex items-start justify-between gap-3 text-sm">
+                        <span className="text-zinc-700 dark:text-zinc-300">
+                          {def?.name ?? su.skillId}
+                          <span className="ml-1.5 text-xs text-zinc-400">{su.note}</span>
+                        </span>
+                        <span
+                          className={`shrink-0 font-semibold ${
+                            su.delta >= 0 ? "text-teal-600" : "text-red-500"
+                          }`}
+                        >
+                          {su.delta >= 0 ? "+" : ""}
+                          {(su.delta * 100).toFixed(0)}%
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {/* 维度分（弱化放底部） */}
+            {review.dimensionScores.length > 0 && (
+              <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                  📈 维度评分
+                </h3>
+                <div className="mt-3 grid grid-cols-3 gap-3">
+                  {review.dimensionScores.map((d) => (
+                    <div key={d.dimension} className="text-center">
+                      <div className="text-xl font-bold text-zinc-800 dark:text-zinc-100">
+                        {d.score.toFixed(1)}
+                      </div>
+                      <div className="mt-0.5 text-xs text-zinc-400">
+                        {DIM_LABEL[d.dimension] ?? d.dimension}
+                      </div>
+                      <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        {d.comment}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 语言/商业反馈 */}
+            {(review.feedbackLanguage?.length ?? 0) > 0 && (
+              <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                  ✍️ 表达改进
+                </h3>
+                <ul className="mt-2.5 space-y-2">
+                  {review.feedbackLanguage.map((fb, i) => (
                     <li key={i} className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-                      <span className="font-medium text-zinc-800 dark:text-zinc-100">
-                        第 {tf.turnIndex} 轮
-                      </span>
-                      ：{tf.comment}
+                      · {fb}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(review.feedbackBusiness?.length ?? 0) > 0 && (
+              <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                  ⚠️ 商业规则核实
+                </h3>
+                <ul className="mt-2.5 space-y-2">
+                  {review.feedbackBusiness.map((fb, i) => (
+                    <li key={i} className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                      · {fb}
                     </li>
                   ))}
                 </ul>
@@ -188,7 +285,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
             <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
               可能是 AI 点评时出了点问题，重试一次。
             </p>
-            <div className="mt-5">
+            <div className="mt-5 w-full">
               <ReviewRetryButton sessionId={id} />
             </div>
           </div>
