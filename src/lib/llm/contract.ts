@@ -29,7 +29,7 @@ import {
 export interface ContractDefinition<T> {
   /** ai_runs.task_type，如 "lesson_plan" / "roleplay_eval" */
   taskType: string;
-  /** 模型档位，默认 turbo */
+  /** 模型档位，默认 flash（全站统一档位） */
   tier?: ModelTier;
   /** system prompt */
   system: string;
@@ -126,7 +126,7 @@ export async function runContract<T>(
 ): Promise<ContractResult<T>> {
   const {
     taskType,
-    tier = "turbo",
+    tier = "flash",
     system,
     toolName,
     toolDescription,
@@ -187,11 +187,11 @@ export async function runContract<T>(
         attempts.push({ status: "dead_letter", error: msg });
         break;
       }
-      // degrade：降级到 turbo 继续（不阻断业务）
+      // degrade：降级到 flash 继续（不阻断业务；flash 已是全站最低成本档位）
       let effectiveTier: ModelTier = tier;
       if (!guard.allowed && guard.decision?.action === "degrade") {
-        effectiveTier = "turbo";
-        console.warn(`[contract] ${taskType} 预算降级为 turbo（${guard.decision.scope} 超限）`);
+        effectiveTier = "flash";
+        console.warn(`[contract] ${taskType} 预算降级为 flash（${guard.decision.scope} 超限）`);
       }
 
       const resp = await chat({

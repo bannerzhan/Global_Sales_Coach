@@ -15,6 +15,7 @@ import {
   type OnboardingInput,
 } from "./actions";
 import type { GoalSuggestion } from "@/lib/llm/goal-suggest";
+import { TranslateBlock } from "@/components/translate-block";
 
 /** 与 actions.ts 的 OnboardingInput.profile 一致（不含 userId/updatedAt） */
 type ProfileInput = OnboardingInput["profile"];
@@ -279,7 +280,9 @@ export function OnboardingWizard() {
                       }
                       className="w-full bg-transparent text-sm font-medium text-zinc-900 outline-none dark:text-zinc-100"
                     />
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{g.rationale}</p>
+                    <TranslateBlock text={g.rationale}>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{g.rationale}</p>
+                    </TranslateBlock>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <input
                         type="date"

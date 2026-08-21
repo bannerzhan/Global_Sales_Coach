@@ -1,4 +1,4 @@
-import { listActiveSessions } from "@/lib/repo/attempt";
+import { listActiveSessions, listCompletedSessions, listAttempts } from "@/lib/repo/attempt";
 import { listGoals } from "@/lib/repo/goal";
 import { getScenario } from "@/lib/repo/scenario";
 import { listSkillStates } from "@/lib/repo/skill-state";
@@ -18,6 +18,8 @@ export default async function PracticePage({
   const uid = (await auth())?.user?.id;
   const goals = await listGoals(uid);
   const active = await listActiveSessions(uid);
+  const completed = await listCompletedSessions(uid);
+  const attempts = await listAttempts(uid);
   const states = await listSkillStates(uid);
 
   const rawFocus = (await searchParams).focus;
@@ -26,6 +28,29 @@ export default async function PracticePage({
 
   const activeWithScenario = await Promise.all(
     active.map(async (s) => ({ session: s, scenario: await getScenario(s.scenarioId) })),
+  );
+
+  // 已结束演练：判断是否已有复盘（evaluation.review 存在）
+  const reviewInfo = (scenarioId: string) => {
+    const withReview = attempts
+      .filter(
+        (a) =>
+          a.scenarioId === scenarioId &&
+          a.evaluation &&
+          (a.evaluation as { review?: unknown }).review,
+      )
+      .sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    const latest = withReview[0];
+    return latest ? { hasReview: true, score: latest.score } : { hasReview: false, score: null };
+  };
+  const completedWithScenario = await Promise.all(
+    completed.map(async (s) => ({
+      session: s,
+      scenario: await getScenario(s.scenarioId),
+      review: reviewInfo(s.scenarioId),
+    })),
   );
 
   return (
@@ -121,6 +146,47 @@ export default async function PracticePage({
                     </div>
                     <span className="text-sm font-medium text-teal-600 dark:text-teal-400">
                       继续 →
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 已结束的演练 / 复盘记录 */}
+        {completedWithScenario.length > 0 && (
+          <div className="mt-8">
+            <h2 className="font-semibold text-zinc-900 dark:text-zinc-50">已结束的演练</h2>
+            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+              点「查看复盘」回顾 AI 对你每句话的逐句点评
+            </p>
+            <ul className="mt-3 space-y-2.5">
+              {completedWithScenario.map(({ session, scenario, review }) => (
+                <li key={session.id}>
+                  <a
+                    href={`/practice/${session.id}/review`}
+                    className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3.5 transition hover:border-teal-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-teal-800"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                        {scenario?.title ?? "演练"}
+                      </div>
+                      <div className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">
+                        {session.turns.length} 轮对话 ·{" "}
+                        {new Date(session.startedAt).toLocaleDateString("zh-CN")}
+                      </div>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+                        review.hasReview
+                          ? "bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-400"
+                          : "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
+                      }`}
+                    >
+                      {review.hasReview
+                        ? `查看复盘${review.score != null ? ` · ${review.score.toFixed(1)}分` : ""}`
+                        : "复盘未生成"}
                     </span>
                   </a>
                 </li>

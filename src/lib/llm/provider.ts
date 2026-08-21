@@ -5,9 +5,9 @@ import { env } from "../env";
  * 火山方舟 LLM Provider（OpenAI 兼容协议封装）。
  *
  * 模型档位：
- *  - pro    → 复杂推理/规划任务（学习路径规划、复盘分析、场景/目标生成）
- *  - turbo  → 通用档（历史兼容默认）
- *  - flash  → 高频实时对话（角色扮演客户、即时反馈），非思考快模型，延迟最低
+ *  - pro    → 复杂推理/规划任务（保留接入口，当前未启用）
+ *  - turbo  → 通用档（保留接入口，当前未启用）
+ *  - flash  → 全站统一档位（角色扮演客户、即时反馈、复盘、目标/场景/基线生成），非思考快模型，延迟最低
  *
  * 接入点（ep-）优先，未配置时回退模型 ID。
  * 2.1 系列思考模型会返回 reasoning_content，需透传给记账层。
@@ -62,7 +62,7 @@ export function getClient(): OpenAI {
     globalForArk.__gscArk = new OpenAI({
       baseURL: env.ARK_BASE_URL,
       apiKey: env.ARK_API_KEY,
-      timeout: 120_000,
+      timeout: 180_000, // 留安全边际：长对话 + 4096 输出下 pro 曾稳定超 120s
       maxRetries: 1, // 网络层重试交给本层控制，避免 SDK 静默重试
     });
   }
@@ -85,7 +85,7 @@ export function resolveModel(tier: ModelTier): string {
  * 返回规范化结果，token 与耗时统计齐全，供记账层消费。
  */
 export async function chat(options: ChatOptions & { messages: ChatMessage[] }): Promise<ChatResult> {
-  const tier = options.tier ?? "turbo";
+  const tier = options.tier ?? "flash";
   const model = resolveModel(tier);
   const startedAt = Date.now();
 

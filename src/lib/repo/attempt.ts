@@ -146,6 +146,22 @@ export async function listActiveSessions(userId?: string): Promise<RoleplaySessi
   );
 }
 
+export async function listCompletedSessions(userId?: string): Promise<RoleplaySession[]> {
+  const uid = userId ?? LOCAL_USER_ID;
+  if (await isDbAvailable()) {
+    const dbUid = userId ?? (await getOrCreateUserId());
+    const { rows } = await pool.query(
+      "SELECT * FROM roleplay_sessions WHERE user_id = $1 AND status = 'completed' ORDER BY started_at DESC",
+      [dbUid],
+    );
+    return rows.map((r) => rowToSession(r, dbUid));
+  }
+  const user = await localGetUser(uid);
+  return ((user?.[SESSIONS_KEY] as RoleplaySession[] | undefined) ?? []).filter(
+    (s) => s.status === "completed",
+  );
+}
+
 // ---------------- Attempts ----------------
 
 function rowToAttempt(row: Record<string, unknown>, userId: string): Attempt {

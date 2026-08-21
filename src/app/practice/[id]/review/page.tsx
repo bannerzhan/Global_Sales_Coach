@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { getLatestReview, retryReview } from "../../actions";
 import { skillById } from "@/lib/repo/skills";
 import { ReviewRetryButton } from "./retry-button";
+import { TranslateBlock } from "@/components/translate-block";
 
 const DIM_LABEL: Record<string, string> = {
   communication: "沟通表达",
@@ -99,44 +100,54 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                         </span>
                       </div>
 
-                      <div className="mt-3 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-950">
-                        <div className="text-xs text-zinc-400">客户说</div>
-                        <p className="mt-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
-                          “{item.customerQuote}”
-                        </p>
-                      </div>
+                      <TranslateBlock text={item.customerQuote}>
+                        <div className="mt-3 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-950">
+                          <div className="text-xs text-zinc-400">客户说</div>
+                          <p className="mt-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+                            “{item.customerQuote}”
+                          </p>
+                        </div>
+                      </TranslateBlock>
 
-                      <div className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-                        <span className="font-medium text-zinc-800 dark:text-zinc-200">
-                          意图：
-                        </span>
-                        {item.intent}
-                      </div>
+                      <TranslateBlock text={item.intent}>
+                        <div className="mt-3 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-950">
+                          <div className="text-xs text-zinc-400">意图</div>
+                          <p className="mt-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+                            {item.intent}
+                          </p>
+                        </div>
+                      </TranslateBlock>
 
                       {item.userResponse && (
-                        <div className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-                          <span className="font-medium text-zinc-800 dark:text-zinc-200">
-                            你的回应：
-                          </span>
-                          “{item.userResponse}”
-                        </div>
+                        <TranslateBlock text={item.userResponse}>
+                          <div className="mt-3 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-950">
+                            <div className="text-xs text-zinc-400">你的回应</div>
+                            <p className="mt-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+                              “{item.userResponse}”
+                            </p>
+                          </div>
+                        </TranslateBlock>
                       )}
 
-                      <div className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-                        <span className="font-medium text-zinc-800 dark:text-zinc-200">
-                          点评：
-                        </span>
-                        {item.assessment}
-                      </div>
-
-                      <div className="mt-3 rounded-xl border border-teal-100 bg-teal-50/60 p-3 dark:border-teal-900 dark:bg-teal-950/30">
-                        <div className="text-xs font-medium text-teal-700 dark:text-teal-400">
-                          更优回应
+                      <TranslateBlock text={item.assessment}>
+                        <div className="mt-3 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-950">
+                          <div className="text-xs text-zinc-400">点评</div>
+                          <p className="mt-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+                            {item.assessment}
+                          </p>
                         </div>
-                        <p className="mt-1 text-sm leading-relaxed text-teal-900 dark:text-teal-200">
-                          {item.betterResponse}
-                        </p>
-                      </div>
+                      </TranslateBlock>
+
+                      <TranslateBlock text={item.betterResponse}>
+                        <div className="mt-3 rounded-xl border border-teal-100 bg-teal-50/60 p-3 dark:border-teal-900 dark:bg-teal-950/30">
+                          <div className="text-xs font-medium text-teal-700 dark:text-teal-400">
+                            更优回应
+                          </div>
+                          <p className="mt-1 text-sm leading-relaxed text-teal-900 dark:text-teal-200">
+                            {item.betterResponse}
+                          </p>
+                        </div>
+                      </TranslateBlock>
 
                       <div className="mt-3 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
                         💡 {item.keyTakeaway}
@@ -164,16 +175,18 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                 <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
                   🎯 关键改进建议
                 </h3>
-                <ul className="mt-2.5 space-y-2">
-                  {review.improvements.map((imp, i) => (
-                    <li
-                      key={i}
-                      className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300"
-                    >
-                      {i + 1}. {imp}
-                    </li>
-                  ))}
-                </ul>
+                <TranslateBlock text={review.improvements.join("\n")}>
+                  <ul className="mt-2.5 space-y-2">
+                    {review.improvements.map((imp, i) => (
+                      <li
+                        key={i}
+                        className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300"
+                      >
+                        {i + 1}. {imp}
+                      </li>
+                    ))}
+                  </ul>
+                </TranslateBlock>
               </div>
             )}
 
@@ -237,13 +250,15 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                 <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
                   ✍️ 表达改进
                 </h3>
-                <ul className="mt-2.5 space-y-2">
-                  {review.feedbackLanguage.map((fb, i) => (
-                    <li key={i} className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-                      · {fb}
-                    </li>
-                  ))}
-                </ul>
+                <TranslateBlock text={review.feedbackLanguage.join("\n")}>
+                  <ul className="mt-2.5 space-y-2">
+                    {review.feedbackLanguage.map((fb, i) => (
+                      <li key={i} className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                        · {fb}
+                      </li>
+                    ))}
+                  </ul>
+                </TranslateBlock>
               </div>
             )}
             {(review.feedbackBusiness?.length ?? 0) > 0 && (
@@ -251,13 +266,15 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                 <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
                   ⚠️ 商业规则核实
                 </h3>
-                <ul className="mt-2.5 space-y-2">
-                  {review.feedbackBusiness.map((fb, i) => (
-                    <li key={i} className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-                      · {fb}
-                    </li>
-                  ))}
-                </ul>
+                <TranslateBlock text={review.feedbackBusiness.join("\n")}>
+                  <ul className="mt-2.5 space-y-2">
+                    {review.feedbackBusiness.map((fb, i) => (
+                      <li key={i} className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                        · {fb}
+                      </li>
+                    ))}
+                  </ul>
+                </TranslateBlock>
               </div>
             )}
 

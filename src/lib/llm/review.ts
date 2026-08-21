@@ -62,6 +62,7 @@ export const ReviewSchema = z.object({
         keyTakeaway: z.string().min(2, "一句话 takeaway"),
       }),
     )
+    .min(1, "至少要逐句分析客户的一句话")
     .max(12)
     .describe(
       "逐条分析客户（买家）的每一句话/每一条消息：意图、谈判角度、用户回应点评、更优回应示例。这是复盘最重要的部分。",
@@ -102,7 +103,12 @@ export async function reviewSession(input: ReviewInput): Promise<{
   degraded?: boolean;
 }> {
   const lang = langOf(input.locale);
-  const dialogue = input.turns
+  // 长对话截断：复盘只取最近 MAX_TURNS 轮，避免输入过长导致 LLM 生成超时
+  // （线上 29 轮对话 flash 实测 ~82s，更长对话会逼近 180s 上限；截断后更快更稳，且最近轮次对复盘最有意义）
+  const MAX_TURNS = 24;
+  const turnsForReview =
+    input.turns.length > MAX_TURNS ? input.turns.slice(-MAX_TURNS) : input.turns;
+  const dialogue = turnsForReview
     .map(
       (t, i) =>
         `${t.role === "user" ? (lang === "en" ? "[Sales]" : "【销售】") : lang === "en" ? "[Buyer]" : "【客户】"}(${i}): ${t.content}`,
@@ -119,7 +125,10 @@ export async function reviewSession(input: ReviewInput): Promise<{
   const result = await runContract<ReviewOutput>(
     {
       taskType: "evaluate_attempt",
-      tier: "pro", // 复盘需要深度推理，用 pro
+      // 复盘用 flash：pro 思考模型实测在长对话+4096输出下稳定超 120s 走兜底；
+      // turbo 同形态也要 130s（接近上限，长对话仍会超时）；flash 实测 18s 返回高质量
+      // 逐句分析，彻底无超时风险，外贸话术解剖也不需要顶级推理。
+      tier: "flash",
       toolName: "emit_review",
       toolDescription: "对销售演练对话输出结构化复盘",
       schema: ReviewSchema,

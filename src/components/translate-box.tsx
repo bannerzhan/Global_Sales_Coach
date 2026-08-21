@@ -1,0 +1,131 @@
+"use client";
+
+import { useState } from "react";
+
+/** 翻译小工具图标（地球） */
+function GlobeIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a15 15 0 0 1 0 18" />
+      <path d="M12 3a15 15 0 0 0 0 18" />
+    </svg>
+  );
+}
+
+/**
+ * 输入框上方翻译小框（组句 / 查词辅助）。
+ * - 默认收起，点输入框旁地球图标才展开成横条；
+ * - 自动识别方向：含中文→英，含英文→中；
+ * - 未翻时按钮=「翻译」，翻完变「填入」；框内文字一改回「翻译」；
+ * - 「填入」通过 onFill 把译文插入主输入框光标处；之后清空 + 复位 + 保持展开；
+ * - 回车：未翻=翻译 / 已翻=填入；
+ * - 失败显示「翻译失败，点此重试」。
+ */
+export function TranslateBox({ onFill }: { onFill: (text: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [text, setText] = useState("");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const isTranslated = result.trim() !== "";
+
+  async function doTranslate() {
+    if (!text.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      }).then((r) => r.json());
+      if (!res.ok || !res.translation) setError(res.error ?? "翻译失败");
+      else setResult(res.translation);
+    } catch {
+      setError("翻译失败，请稍后重试");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleMainClick() {
+    if (isTranslated) {
+      onFill(result);
+      // 填入后：清空 + 复位 + 保持展开
+      setText("");
+      setResult("");
+      setError("");
+    } else {
+      doTranslate();
+    }
+  }
+
+  function handleChange(v: string) {
+    setText(v);
+    if (isTranslated) setResult(""); // 文字一变 → 回到翻译模式
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (isTranslated) handleMainClick();
+      else doTranslate();
+    }
+  }
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        title="翻译小工具"
+        aria-label="翻译小工具"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-500 transition hover:border-teal-400 hover:text-teal-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+      >
+        <GlobeIcon />
+      </button>
+    );
+  }
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900">
+        <input
+          value={text}
+          onChange={(e) => handleChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="翻译：输入中文组句 / 英文查词"
+          className="min-w-0 flex-1 bg-transparent px-1.5 py-1 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
+        />
+        <button
+          type="button"
+          onClick={handleMainClick}
+          disabled={loading || (!isTranslated && !text.trim())}
+          className="h-8 shrink-0 rounded-lg bg-teal-600 px-3 text-sm font-medium text-white transition hover:bg-teal-700 disabled:opacity-50"
+        >
+          {loading ? (
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+          ) : isTranslated ? (
+            "填入"
+          ) : (
+            "翻译"
+          )}
+        </button>
+      </div>
+      {error && <p className="mt-1 px-1 text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}

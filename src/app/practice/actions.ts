@@ -151,7 +151,7 @@ export async function finishPractice(sessionId: string) {
     locale: scenario?.locale,
   });
 
-  if (review.ok && review.data) {
+  if (review.ok && review.data && !review.degraded) {
     const data: ReviewOutput = review.data;
     // 落 attempts 记录（task_type=roleplay_turn，evaluation=复盘结果）
     const lastUserTurn = [...completed.turns].reverse().find((t) => t.role === "user");
@@ -189,6 +189,9 @@ export async function retryReview(sessionId: string): Promise<{ ok: boolean; err
     locale: scenario?.locale,
   });
   if (!review.ok || !review.data) return { ok: false, error: "复盘失败，请重试" };
+  // LLM 调用失败走了兜底（customerSentenceAnalysis 为空数组）：不要落库误导用户，
+  // 直接提示稍后再试，避免页面误判为「未生成逐句分析」。
+  if (review.degraded) return { ok: false, error: "AI 暂时繁忙，复盘未生成，请稍后再试" };
 
   await createAttempt(
     {

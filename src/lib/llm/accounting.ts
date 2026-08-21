@@ -72,7 +72,7 @@ export interface RunRecord {
 
 export async function recordRun(rec: RunRecord): Promise<number> {
   const provider = rec.provider ?? PROVIDER;
-  const tier = rec.tier ?? "turbo";
+  const tier = rec.tier ?? "flash";
   const costEstimate = estimateCost(
     tier,
     rec.inputTokens,

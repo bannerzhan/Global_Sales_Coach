@@ -6,6 +6,8 @@ import { sendMessage, finishPractice } from "../actions";
 import type { RoleplayTurn } from "@/lib/repo/types";
 import { VoiceInputButton } from "@/components/voice-input-button";
 import { VoicePlayButton } from "@/components/voice-play-button";
+import { TranslateBlock } from "@/components/translate-block";
+import { TranslateBox } from "@/components/translate-box";
 
 /**
  * 角色扮演聊天界面（移动端优先）。
@@ -29,6 +31,7 @@ export function ChatView({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -79,6 +82,24 @@ export function ChatView({
     });
   }
 
+  /** 把译文插入主输入框光标处（无 ref 时追加到末尾） */
+  function insertAtCursor(fill: string) {
+    const ta = textareaRef.current;
+    if (!ta) {
+      setInput((prev) => (prev ? prev + fill : fill));
+      return;
+    }
+    const start = ta.selectionStart ?? input.length;
+    const end = ta.selectionEnd ?? input.length;
+    const next = input.slice(0, start) + fill + input.slice(end);
+    setInput(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = start + fill.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
       {/* 消息区 */}
@@ -103,8 +124,10 @@ export function ChatView({
       {/* 输入区 */}
       {active ? (
         <div className="border-t border-zinc-200 bg-white/90 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
+          <TranslateBox onFill={insertAtCursor} />
           <form onSubmit={handleSend} className="flex items-end gap-2">
             <textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -167,9 +190,10 @@ function MessageBubble({ turn }: { turn: RoleplayTurn }) {
           {turn.content}
         </div>
         {!isUser && (
-          <div className="mt-1">
-            <VoicePlayButton text={turn.content} />
-          </div>
+          <TranslateBlock
+            text={turn.content}
+            leading={<VoicePlayButton text={turn.content} />}
+          />
         )}
       </div>
     </div>

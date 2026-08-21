@@ -83,7 +83,7 @@ export async function suggestGoals({ profile, userId, locale }: SuggestGoalsInpu
   const result = await runContract<{ goals: GoalSuggestion[] }>(
     {
       taskType: "goal_suggest",
-      tier: "pro",
+      tier: "flash",
       toolName: "emit_goals",
       toolDescription: "根据用户销售画像输出 3 个具体、可衡量、有截止日期的学习目标",
       schema: GoalSuggestionSchema,

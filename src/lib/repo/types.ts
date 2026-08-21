@@ -124,3 +124,97 @@ export interface ReviewResult {
   skillUpdates: { skillId: string; delta: number; note: string }[];
   turnFeedback: { turnIndex: number; comment: string }[];
 }
+
+// ---------------------------------------------------------------------------
+// 模拟电话（Call Coach）
+// ---------------------------------------------------------------------------
+
+/** 通话目的枚举 */
+export type CallPurpose =
+  | "follow_up_inquiry"
+  | "negotiation"
+  | "collection"
+  | "complaint"
+  | "relationship"
+  | "other";
+
+export const CALL_PURPOSES: { value: CallPurpose; label: string }[] = [
+  { value: "follow_up_inquiry", label: "跟进询盘" },
+  { value: "negotiation", label: "议价压价" },
+  { value: "collection", label: "催款" },
+  { value: "complaint", label: "投诉处理" },
+  { value: "relationship", label: "维护关系" },
+  { value: "other", label: "其他" },
+];
+
+/** 客户档案（7 字段） */
+export interface Customer {
+  id: string;
+  userId: string;
+  name: string; // 客户名/公司
+  countryMarket: string; // 国家市场
+  role: string; // 职位
+  mainProduct: string; // 主营产品
+  history: string; // 跟我们历史（询盘/试样/下单/投诉）
+  painPoints: string; // 已知痛点
+  notes: string; // 备注
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 我们这边信息（通话简报） */
+export interface OurSideInfo {
+  product: string; // 产品/报价立场
+  pricePosition: string; // 报价立场
+  relationStage: string; // 关系阶段
+  pastInteractions: string; // 过往互动
+}
+
+/** 通话一轮对话 */
+export interface CallTurn {
+  role: "user" | "ai_customer";
+  content: string;
+  createdAt: string;
+}
+
+/** 通话脚本骨架（生成一次，通话前/中参考） */
+export interface CallScript {
+  openingSuggestion: string; // 建议开场白
+  likelyObjections: string[]; // 客户可能异议
+  advancePoints: string[]; // 推进成交要点
+  closingSuggestion: string; // 建议收尾
+}
+
+/** 一通电话会话 */
+export interface CallSession {
+  id: string;
+  userId: string;
+  customerId: string | null;
+  customerSnapshot: Customer | null;
+  purpose: CallPurpose;
+  purposeOther: string | null;
+  ourSide: OurSideInfo;
+  scriptSkeleton: CallScript | null;
+  status: "active" | "completed";
+  turns: CallTurn[];
+  transcript: string | null;
+  startedAt: string;
+  endedAt: string | null;
+}
+
+/** 通话复盘四维度之一 */
+export interface CallReviewDimension {
+  key: "opening" | "objection" | "advance" | "closing";
+  label: string;
+  score: number; // 0-10
+  comment: string;
+  betterResponse: string;
+}
+
+/** 通话复盘输出 */
+export interface CallReviewResult {
+  overallScore: number; // 0-10
+  dimensions: CallReviewDimension[]; // 固定 4 个维度
+  highlights: string[];
+  improvements: string[];
+}

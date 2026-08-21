@@ -4,6 +4,7 @@ import { getLatestBaseline } from "@/lib/repo/assessment";
 import { ASSESSMENT_DIM_LABEL } from "@/lib/llm/assessment";
 import { AssessmentForm } from "./form";
 import { auth } from "@/auth";
+import { TranslateBlock } from "@/components/translate-block";
 
 /**
  * 基线评估页：展示上一次测评结果 + 重新测评入口。
@@ -42,13 +43,17 @@ export default async function AssessmentPage() {
                       style={{ width: `${s.score * 10}%` }}
                     />
                   </div>
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{s.summary}</p>
+                  <TranslateBlock text={s.summary}>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{s.summary}</p>
+                  </TranslateBlock>
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-300">
-              {baseline.overallSummary}
-            </p>
+            <TranslateBlock text={baseline.overallSummary}>
+              <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-300">
+                {baseline.overallSummary}
+              </p>
+            </TranslateBlock>
           </div>
         )}
 
