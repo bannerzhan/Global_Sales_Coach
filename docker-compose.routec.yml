@@ -84,6 +84,12 @@ services:
       VOICE_GATEWAY_PORT: 8787
       # 密钥后端存，前端不接触
       VOICE_API_KEY: ${VOICE_API_KEY:-}
+      VOICE_ASR_RESOURCE_ID: ${VOICE_ASR_RESOURCE_ID:-volc.bigasr.sauc.async}
+      VOICE_TTS_RESOURCE_ID: ${VOICE_TTS_RESOURCE_ID:-seed-tts-2.0}
+      VOICE_TTS_SPEAKER: ${VOICE_TTS_SPEAKER:-en_female_dacey_uranus_bigtts}
+      VOICE_APP_ID: ${VOICE_APP_ID:-}
+      VOICE_CLUSTER: ${VOICE_CLUSTER:-}
+      VOICE_LANG: ${VOICE_LANG:-en}
       ARK_API_KEY: ${ARK_API_KEY:?请在 .env 中设置 ARK_API_KEY}
       ARK_BASE_URL: ${ARK_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}
       ARK_ENDPOINT_FLASH: ${ARK_ENDPOINT_FLASH:?请在 .env 中设置 ARK_ENDPOINT_FLASH}

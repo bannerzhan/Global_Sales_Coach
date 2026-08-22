@@ -33,6 +33,12 @@ import { streamLlm } from "./adapters/llm";
 const PORT = Number(process.env.VOICE_GATEWAY_PORT || 8787);
 const VOICE_API_KEY = process.env.VOICE_API_KEY || "";
 const ARK_API_KEY = process.env.ARK_API_KEY || "";
+const VOICE_ASR_RESOURCE_ID = process.env.VOICE_ASR_RESOURCE_ID || "volc.bigasr.sauc.async";
+const VOICE_TTS_RESOURCE_ID = process.env.VOICE_TTS_RESOURCE_ID || "seed-tts-2.0";
+const VOICE_TTS_SPEAKER = process.env.VOICE_TTS_SPEAKER || "en_female_dacey_uranus_bigtts";
+const VOICE_APP_ID = process.env.VOICE_APP_ID || "";
+const VOICE_CLUSTER = process.env.VOICE_CLUSTER || "";
+const VOICE_LANG = process.env.VOICE_LANG || "en";
 
 interface Session {
   type: "transcribe" | "dialogue";
@@ -95,7 +101,7 @@ wss.on("connection", (ws) => {
           onFinal: (t) => send(ws, { type: "final", text: t }),
           onError: (e) => send(ws, { type: "error", message: e }),
           onClose: () => {},
-        });
+        }, { resourceId: VOICE_ASR_RESOURCE_ID, appId: VOICE_APP_ID, cluster: VOICE_CLUSTER, lang: VOICE_LANG });
         asr.start().catch((e) => send(ws, { type: "error", message: String(e) }));
         session!.asr = asr;
         if (!VOICE_API_KEY) send(ws, { type: "info", message: "ASR 降级模式（无 VOICE_API_KEY）" });
@@ -114,7 +120,7 @@ wss.on("connection", (ws) => {
             send(ws, { type: "error", message: `TTS: ${e}` });
             ws.close();
           },
-        });
+        }, VOICE_TTS_SPEAKER, { resourceId: VOICE_TTS_RESOURCE_ID, appId: VOICE_APP_ID, cluster: VOICE_CLUSTER });
         tts.start(msg.text || "").catch((e) => {
           send(ws, { type: "error", message: String(e) });
           ws.close();
@@ -134,7 +140,7 @@ wss.on("connection", (ws) => {
           },
           onError: (e) => send(ws, { type: "error", message: e }),
           onClose: () => {},
-        });
+        }, { resourceId: VOICE_ASR_RESOURCE_ID, appId: VOICE_APP_ID, cluster: VOICE_CLUSTER, lang: VOICE_LANG });
         asr.start().catch((e) => send(ws, { type: "error", message: String(e) }));
         session!.asr = asr;
         if (!VOICE_API_KEY) send(ws, { type: "info", message: "语音链路降级模式（无 VOICE_API_KEY）" });
@@ -199,7 +205,7 @@ async function runLlm(ws: WebSocket, session: Session, userText: string) {
           send(ws, { type: "error", message: `TTS: ${e}` });
           session.ttsSpeaking = false;
         },
-      });
+      }, VOICE_TTS_SPEAKER, { resourceId: VOICE_TTS_RESOURCE_ID, appId: VOICE_APP_ID, cluster: VOICE_CLUSTER });
       tts.start(full).catch((e) => {
         send(ws, { type: "error", message: String(e) });
         session.ttsSpeaking = false;
@@ -213,4 +219,4 @@ async function runLlm(ws: WebSocket, session: Session, userText: string) {
 }
 
 console.log(`[voice-gateway] listening on ws://0.0.0.0:${PORT}`);
-console.log(`[voice-gateway] VOICE_API_KEY=${VOICE_API_KEY ? "set" : "EMPTY(degraded)"} ARK_API_KEY=${ARK_API_KEY ? "set" : "EMPTY(degraded)"}`);
+console.log(`[voice-gateway] VOICE_API_KEY=${VOICE_API_KEY ? "set" : "EMPTY(degraded)"} ARK_API_KEY=${ARK_API_KEY ? "set" : "EMPTY(degraded)"} ASR=${VOICE_ASR_RESOURCE_ID} TTS=${VOICE_TTS_RESOURCE_ID} speaker=${VOICE_TTS_SPEAKER} lang=${VOICE_LANG}`);

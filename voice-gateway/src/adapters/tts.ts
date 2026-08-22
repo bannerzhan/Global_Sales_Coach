@@ -26,15 +26,22 @@ export class VolcanoTts {
   private handlers: TtsHandlers;
   private reqId = `gsc-tts-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   private speaker: string;
+  private resourceId: string;
+  private appId: string;
+  private cluster: string;
 
   constructor(
     private apiKey: string,
     handlers: TtsHandlers,
-    speaker = "zh_female_gaolengyujie_uranus_bigtts",
+    speaker = "en_female_dacey_uranus_bigtts",
+    opts: { resourceId?: string; appId?: string; cluster?: string } = {},
   ) {
     this.degraded = !apiKey;
     this.handlers = handlers;
     this.speaker = speaker;
+    this.resourceId = opts.resourceId || RESOURCE_ID;
+    this.appId = opts.appId || "";
+    this.cluster = opts.cluster || "";
   }
 
   async start(text: string): Promise<void> {
@@ -47,11 +54,11 @@ export class VolcanoTts {
       this.ws = ws;
       ws.on("open", () => {
         const startMsg = {
-          app: { appid: "", token: "", cluster: "" },
+          app: { appid: this.appId, token: "", cluster: this.cluster },
           user: { uid: "gsc" },
           audio: { voice_type: this.speaker, encoding: "mp3", speed_ratio: 1.0, rate: 24000 },
           request: { reqid: this.reqId, operation: "submit", text },
-          resource_id: RESOURCE_ID,
+          resource_id: this.resourceId,
         };
         ws.send(JSON.stringify(startMsg));
         resolve();

@@ -29,14 +29,23 @@ export class VolcanoAsr {
   private seq = 0;
   private degraded: boolean;
   private handlers: AsrHandlers;
+  private resourceId: string;
+  private appId: string;
+  private cluster: string;
+  private lang: string;
   private reqId = `gsc-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
   constructor(
     private apiKey: string,
     handlers: AsrHandlers,
+    opts: { resourceId?: string; appId?: string; cluster?: string; lang?: string } = {},
   ) {
     this.degraded = !apiKey;
     this.handlers = handlers;
+    this.resourceId = opts.resourceId || RESOURCE_ID;
+    this.appId = opts.appId || "";
+    this.cluster = opts.cluster || "";
+    this.lang = opts.lang || "en";
   }
 
   /** 建立连接并发送 start 控制消息 */
@@ -52,11 +61,12 @@ export class VolcanoAsr {
       this.ws = ws;
       ws.on("open", () => {
         const startMsg = {
-          app: { appid: "", token: "", cluster: "" },
+          app: { appid: this.appId, token: "", cluster: this.cluster },
           user: { uid: "gsc" },
           audio: { format: "pcm", codec: "raw", rate: 16000, bits: 16, channel: 1 },
           request: { reqid: this.reqId, workflow: "audio_in,language_recognition" },
-          resource_id: RESOURCE_ID,
+          resource_id: this.resourceId,
+          language: this.lang,
         };
         ws.send(encodeControlFrame(startMsg, this.seq++, (b) => zlib.gzipSync(b)));
         resolve();
