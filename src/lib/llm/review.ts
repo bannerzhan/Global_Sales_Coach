@@ -3,6 +3,7 @@ import { runContract } from "./contract";
 import { langOf, outputLangLine } from "./lang";
 import type { ReviewResult, RoleplayTurn } from "../repo/types";
 import { SKILLS } from "../repo/skills";
+import { REVIEW_MAX_TURNS } from "./review-config";
 
 /**
  * 演练复盘（Review / Evaluate Attempt）。
@@ -103,11 +104,12 @@ export async function reviewSession(input: ReviewInput): Promise<{
   degraded?: boolean;
 }> {
   const lang = langOf(input.locale);
-  // 长对话截断：复盘只取最近 MAX_TURNS 轮，避免输入过长导致 LLM 生成超时
+  // 长对话截断：复盘只取最近 REVIEW_MAX_TURNS 轮，避免输入过长导致 LLM 生成超时
   // （线上 29 轮对话 flash 实测 ~82s，更长对话会逼近 180s 上限；截断后更快更稳，且最近轮次对复盘最有意义）
-  const MAX_TURNS = 24;
   const turnsForReview =
-    input.turns.length > MAX_TURNS ? input.turns.slice(-MAX_TURNS) : input.turns;
+    input.turns.length > REVIEW_MAX_TURNS
+      ? input.turns.slice(-REVIEW_MAX_TURNS)
+      : input.turns;
   const dialogue = turnsForReview
     .map(
       (t, i) =>

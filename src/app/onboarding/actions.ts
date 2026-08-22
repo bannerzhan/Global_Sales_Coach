@@ -37,8 +37,9 @@ export async function suggestGoalsAction(profile: Omit<Profile, "userId" | "upda
   error?: string;
 }> {
   try {
+    const uid = (await auth())?.user?.id;
     return await suggestGoals({
-      profile: { userId: "local", ...profile, updatedAt: new Date().toISOString() },
+      profile: { userId: uid ?? "local", ...profile, updatedAt: new Date().toISOString() },
       locale: profile.locale,
     });
   } catch (err) {

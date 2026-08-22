@@ -38,10 +38,11 @@ export async function createPractice(focusSkillId?: string | null) {
 
   const gen = await generateScenario({
     goalTitle,
+    userId: uid,
     profile:
       profile ??
       ({
-        userId: "local",
+        userId: uid ?? "local",
         occupation: "外贸业务员",
         industry: null,
         markets: [],
@@ -114,6 +115,7 @@ export async function sendMessage(
     turns: updated.turns,
     latestUserMessage: text,
     sessionId,
+    userId: uid,
     locale: scenario.locale,
   });
 
@@ -148,6 +150,7 @@ export async function finishPractice(sessionId: string) {
     objectives: scenario?.objectives ?? [],
     turns: completed.turns,
     sessionId,
+    userId: uid,
     locale: scenario?.locale,
   });
 
@@ -186,6 +189,7 @@ export async function retryReview(sessionId: string): Promise<{ ok: boolean; err
     objectives: scenario?.objectives ?? [],
     turns: session.turns,
     sessionId,
+    userId: uid,
     locale: scenario?.locale,
   });
   if (!review.ok || !review.data) return { ok: false, error: "复盘失败，请重试" };

@@ -47,9 +47,36 @@ function send(ws: WebSocket, obj: unknown) {
 
 const wss = new WebSocketServer({ port: PORT });
 
+// 心跳 + 最大会话时长，防止客户端异常断网导致 ASR 长连 / session 永不回收
+const HEARTBEAT_MS = 15_000;
+const MAX_SESSION_MS = 30 * 60_000; // 单通会话最长 30 分钟
+
 wss.on("connection", (ws) => {
   let session: Session | null = null;
   let pendingUserText = "";
+  let alive = true;
+
+  const heartbeat = setInterval(() => {
+    if (!alive) {
+      ws.terminate();
+      return;
+    }
+    alive = false;
+    try {
+      ws.ping();
+    } catch {
+      ws.terminate();
+    }
+  }, HEARTBEAT_MS);
+
+  const sessionTimer = setTimeout(() => {
+    send(ws, { type: "error", message: "会话超时（30分钟），请刷新重连" });
+    ws.terminate();
+  }, MAX_SESSION_MS);
+
+  ws.on("pong", () => {
+    alive = true;
+  });
 
   ws.on("message", (raw) => {
     let msg: any;
@@ -96,6 +123,7 @@ wss.on("connection", (ws) => {
         return;
       }
       if (msg.type === "dialogue") {
+        session = { type: "dialogue", systemPrompt: msg.systemPrompt || "", ttsSpeaking: false };
         const asr = new VolcanoAsr(VOICE_API_KEY, {
           onPartial: (t) => send(ws, { type: "partial", text: t }),
           onFinal: (t) => {
@@ -135,6 +163,14 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
+    clearInterval(heartbeat);
+    clearTimeout(sessionTimer);
+    session?.asr?.close();
+  });
+
+  ws.on("error", () => {
+    clearInterval(heartbeat);
+    clearTimeout(sessionTimer);
     session?.asr?.close();
   });
 });

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { runContract } from "./contract";
 import { langOf, outputLangLine } from "./lang";
 import { CALL_PURPOSES, type CallPurpose, type CallTurn, type Customer, type OurSideInfo } from "../repo/types";
+import { REVIEW_MAX_TURNS } from "./review-config";
 
 /**
  * 模拟电话复盘（Call Review）。
@@ -58,8 +59,8 @@ export async function reviewCall(input: CallReviewInput): Promise<{
   const lang = langOf(locale);
   const purposeLabel = PURPOSE_LABEL(purpose, purposeOther);
 
-  const MAX_TURNS = 40;
-  const turnsForReview = turns.length > MAX_TURNS ? turns.slice(-MAX_TURNS) : turns;
+  const turnsForReview =
+    turns.length > REVIEW_MAX_TURNS ? turns.slice(-REVIEW_MAX_TURNS) : turns;
   const dialogue = turnsForReview
     .map(
       (t, i) =>

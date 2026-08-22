@@ -8,10 +8,13 @@ declare module "ws" {
     constructor(address: string, options?: { headers?: Record<string, string> });
     send(data: string | Buffer | ArrayBuffer | Buffer[]): void;
     close(): void;
+    ping(): void;
+    terminate(): void;
     on(event: "open", cb: () => void): this;
     on(event: "message", cb: (data: RawData) => void): this;
     on(event: "error", cb: (err: Error) => void): this;
     on(event: "close", cb: () => void): this;
+    on(event: "pong", cb: () => void): this;
     on(event: "unexpected-response", cb: (req: unknown, res: { statusCode?: number }) => void): this;
   }
   type RawData = Buffer | ArrayBuffer | Buffer[];
