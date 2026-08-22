@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "voice-gateway": "tsx voice-gateway/src/server.ts"
+    "voice-gateway": "tsx voice-gateway/src/server.ts",
+    "test": "node --import ./node_modules/tsx/dist/loader.mjs --test src/**/*.test.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
