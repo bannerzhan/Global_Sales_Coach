@@ -28,22 +28,18 @@ function GlobeIcon() {
  * 输入框上方翻译小框（组句 / 查词辅助）。
  * - 默认收起，点输入框旁地球图标才展开成横条；
  * - 自动识别方向：含中文→英，含英文→中；
- * - 未翻时按钮=「翻译」，翻完变「填入」；框内文字一改回「翻译」；
- * - 「填入」通过 onFill 把译文插入主输入框光标处；之后清空 + 复位 + 保持展开；
- * - 回车：未翻=翻译 / 已翻=填入；
- * - 失败显示「翻译失败，点此重试」。
+ * - 翻译成功即自动把译文填入主输入框（光标处/末尾），无需「填入」按钮；
+ *   填入后清空本框、保持展开，方便继续翻译；
+ * - 回车=翻译；失败显示「翻译失败，点此重试」。
  */
 export function TranslateBox({ onFill }: { onFill: (text: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [text, setText] = useState("");
-  const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const isTranslated = result.trim() !== "";
-
   async function doTranslate() {
-    if (!text.trim()) return;
+    if (!text.trim() || loading) return;
     setLoading(true);
     setError("");
     try {
@@ -52,8 +48,14 @@ export function TranslateBox({ onFill }: { onFill: (text: string) => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       }).then((r) => r.json());
-      if (!res.ok || !res.translation) setError(res.error ?? "翻译失败");
-      else setResult(res.translation);
+      if (!res.ok || !res.translation) {
+        setError(res.error ?? "翻译失败");
+      } else {
+        // 翻译成功 → 直接填入主输入框，无需二次点击
+        onFill(res.translation);
+        setText("");
+        setError("");
+      }
     } catch {
       setError("翻译失败，请稍后重试");
     } finally {
@@ -61,28 +63,14 @@ export function TranslateBox({ onFill }: { onFill: (text: string) => void }) {
     }
   }
 
-  function handleMainClick() {
-    if (isTranslated) {
-      onFill(result);
-      // 填入后：清空 + 复位 + 保持展开
-      setText("");
-      setResult("");
-      setError("");
-    } else {
-      doTranslate();
-    }
-  }
-
   function handleChange(v: string) {
     setText(v);
-    if (isTranslated) setResult(""); // 文字一变 → 回到翻译模式
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (isTranslated) handleMainClick();
-      else doTranslate();
+      doTranslate();
     }
   }
 
@@ -112,14 +100,12 @@ export function TranslateBox({ onFill }: { onFill: (text: string) => void }) {
         />
         <button
           type="button"
-          onClick={handleMainClick}
-          disabled={loading || (!isTranslated && !text.trim())}
+          onClick={doTranslate}
+          disabled={loading || !text.trim()}
           className="h-8 shrink-0 rounded-lg bg-teal-600 px-3 text-sm font-medium text-white transition hover:bg-teal-700 disabled:opacity-50"
         >
           {loading ? (
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-          ) : isTranslated ? (
-            "填入"
           ) : (
             "翻译"
           )}

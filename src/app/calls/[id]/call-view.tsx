@@ -91,8 +91,10 @@ export function CallView({
       setInput((prev) => (prev ? prev + fill : fill));
       return;
     }
-    const start = ta.selectionStart ?? input.length;
-    const end = ta.selectionEnd ?? input.length;
+    // 翻译框自动填入时主输入框无焦点：追加到末尾，避免依赖不确定的光标位
+    const focused = typeof document !== "undefined" && document.activeElement === ta;
+    const start = focused ? (ta.selectionStart ?? input.length) : input.length;
+    const end = focused ? (ta.selectionEnd ?? input.length) : input.length;
     const next = input.slice(0, start) + fill + input.slice(end);
     setInput(next);
     requestAnimationFrame(() => {

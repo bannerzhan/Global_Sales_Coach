@@ -58,15 +58,27 @@ export class VoiceClient {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(gatewayUrl());
       this.ws = ws;
+      let settled = false;
+      const fail = (msg: string) => {
+        if (settled) return;
+        settled = true;
+        reject(new Error(msg));
+      };
       ws.onopen = () => {
         this.connected = true;
         ws.send(JSON.stringify({ type, systemPrompt }));
-        resolve();
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
       };
-      ws.onerror = () => reject(new Error("语音网关连接失败"));
+      ws.onerror = () => fail("语音网关连接失败（请确认语音服务已启动）");
       ws.onmessage = (ev) => this.onMessage(ev.data);
+      // 关键：连接被拒/网关未启动时常走 onclose 而非 onerror，必须也 reject，
+      // 否则 Promise 永不结算，按钮一直显示「连接语音服务…」
       ws.onclose = () => {
         this.connected = false;
+        fail("语音网关连接失败（请确认语音服务已启动）");
       };
     });
   }
