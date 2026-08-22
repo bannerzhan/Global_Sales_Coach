@@ -1,7 +1,7 @@
 import { pool } from "../db";
 import { skillById, type SkillState } from "./skills";
 import { reviewFsrs, masteryFromStability, mapDeltaToRating, DEFAULT_RETENTION, type Rating } from "../fsrs";
-import { getOrCreateUserId, isDbAvailable, LOCAL_USER_ID, localGetUser, localSaveUser } from "./storage";
+import { isDbAvailable, patchLocalUser, readLocalUser, resolveUid } from "./storage";
 
 /**
  * 技能掌握状态 repo（skill_states 表映射）。
@@ -14,31 +14,29 @@ import { getOrCreateUserId, isDbAvailable, LOCAL_USER_ID, localGetUser, localSav
 const STATES_KEY = "skillStates";
 
 export async function getSkillState(skillId: string, userId?: string): Promise<SkillState | null> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM skill_states WHERE user_id = $1 AND skill_id = $2",
-      [dbUid, skillId],
+      [uid, skillId],
     );
     if (!rows[0]) return null;
-    return rowToState(rows[0], dbUid);
+    return rowToState(rows[0], uid);
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[STATES_KEY] as SkillState[] | undefined) ?? []).find((s) => s.skillId === skillId) ?? null;
 }
 
 export async function listSkillStates(userId?: string): Promise<SkillState[]> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM skill_states WHERE user_id = $1 ORDER BY mastery DESC",
-      [dbUid],
+      [uid],
     );
-    return rows.map((r) => rowToState(r, dbUid));
+    return rows.map((r) => rowToState(r, uid));
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[STATES_KEY] as SkillState[] | undefined) ?? []).sort(
     (a, b) => b.mastery - a.mastery,
   );
@@ -59,10 +57,11 @@ export async function applySkillUpdates(
 ): Promise<SkillState[]> {
   const results: SkillState[] = [];
   const now = Date.now();
+  const uid = await resolveUid(userId);
   for (const u of updates) {
     const def = skillById(u.skillId);
     if (!def) continue;
-    const prev = await getSkillState(u.skillId, userId);
+    const prev = await getSkillState(u.skillId, uid);
     const prevState = prev
       ? {
           stability: prev.stability,
@@ -77,7 +76,7 @@ export async function applySkillUpdates(
     const rating: Rating = mapDeltaToRating(u.delta);
     const next = reviewFsrs(prevState, rating, now, DEFAULT_RETENTION);
     const state: SkillState = {
-      userId: userId ?? LOCAL_USER_ID,
+      userId: uid,
       skillId: u.skillId,
       mastery: masteryFromStability(next.stability),
       stability: next.stability,
@@ -88,7 +87,7 @@ export async function applySkillUpdates(
       lastReview: new Date(next.lastReview!).toISOString(),
     };
     results.push(state);
-    await upsertState(state, userId);
+    await upsertState(state, uid);
   }
   return results;
 }
@@ -108,24 +107,23 @@ function rowToState(row: Record<string, unknown>, userId: string): SkillState {
 }
 
 async function upsertState(state: SkillState, userId?: string): Promise<void> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     await pool.query(
       `INSERT INTO skill_states
-         (user_id, skill_id, mastery, stability, difficulty, reps, lapses, last_review, next_review)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       ON CONFLICT (user_id, skill_id) DO UPDATE SET
-         mastery = EXCLUDED.mastery,
-         stability = EXCLUDED.stability,
-         difficulty = EXCLUDED.difficulty,
-         reps = EXCLUDED.reps,
-         lapses = EXCLUDED.lapses,
-         last_review = EXCLUDED.last_review,
-         next_review = EXCLUDED.next_review,
-         updated_at = now()`,
+        (user_id, skill_id, mastery, stability, difficulty, reps, lapses, last_review, next_review)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      ON CONFLICT (user_id, skill_id) DO UPDATE SET
+        mastery = EXCLUDED.mastery,
+        stability = EXCLUDED.stability,
+        difficulty = EXCLUDED.difficulty,
+        reps = EXCLUDED.reps,
+        lapses = EXCLUDED.lapses,
+        last_review = EXCLUDED.last_review,
+        next_review = EXCLUDED.next_review,
+        updated_at = now()`,
       [
-        dbUid,
+        uid,
         state.skillId,
         state.mastery,
         state.stability,
@@ -138,10 +136,10 @@ async function upsertState(state: SkillState, userId?: string): Promise<void> {
     );
     return;
   }
-  const user = (await localGetUser(uid)) ?? { userId: uid };
+  const user = await readLocalUser(uid);
   const states = (user[STATES_KEY] as SkillState[] | undefined) ?? [];
   const idx = states.findIndex((s) => s.skillId === state.skillId);
   if (idx >= 0) states[idx] = state;
   else states.push(state);
-  await localSaveUser(uid, { [STATES_KEY]: states });
+  await patchLocalUser(uid, { [STATES_KEY]: states });
 }

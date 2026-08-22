@@ -1,10 +1,9 @@
 import { pool } from "../db";
-import { isDbAvailable, LOCAL_USER_ID, localGetUser, localSaveUser } from "./storage";
-import { getOrCreateUserId } from "./storage";
+import { isDbAvailable, patchLocalUser, readLocalUser, resolveUid } from "./storage";
 
 /**
  * 基线评估快照读写（assessments 表 / 本地 JSON 兜底）。
- * 单用户：DB 模式用 email→UUID；本地模式用 LOCAL_USER_ID。
+ * 单用户：DB 模式用真实 UUID；本地模式用 LOCAL_USER_ID。统一经 resolveUid。
  */
 
 export interface DimensionScore {
@@ -29,11 +28,10 @@ export async function saveBaseline(
   },
   userId?: string,
 ): Promise<BaselineAssessment> {
-  const dbOk = await isDbAvailable();
+  const uid = await resolveUid(userId);
   const createdAt = new Date().toISOString();
 
-  if (dbOk) {
-    const uid = userId ?? (await getOrCreateUserId());
+  if (await isDbAvailable()) {
     const { rows } = await pool.query<{ id: string; created_at: string }>(
       `INSERT INTO assessments (user_id, dimension_scores, overall_summary, self_ratings)
        VALUES ($1,$2,$3,$4)
@@ -55,22 +53,20 @@ export async function saveBaseline(
   }
 
   // 本地兜底
-  const existing = (await localGetUser(LOCAL_USER_ID)) ?? {};
   const baseline: BaselineAssessment = {
-    userId: LOCAL_USER_ID,
+    userId: uid,
     dimensionScores: input.dimensionScores,
     overallSummary: input.overallSummary,
     selfRatings: input.selfRatings ?? null,
     createdAt,
   };
-  await localSaveUser(LOCAL_USER_ID, { baseline });
+  await patchLocalUser(uid, { baseline });
   return baseline;
 }
 
 export async function getLatestBaseline(userId?: string): Promise<BaselineAssessment | null> {
-  const dbOk = await isDbAvailable();
-  if (dbOk) {
-    const uid = userId ?? (await getOrCreateUserId());
+  const uid = await resolveUid(userId);
+  if (await isDbAvailable()) {
     const { rows } = await pool.query<{
       dimension_scores: DimensionScore[];
       overall_summary: string;
@@ -92,7 +88,7 @@ export async function getLatestBaseline(userId?: string): Promise<BaselineAssess
     };
   }
 
-  const user = await localGetUser(LOCAL_USER_ID);
+  const user = await readLocalUser(uid);
   const baseline = user?.baseline as BaselineAssessment | undefined;
   return baseline ?? null;
 }

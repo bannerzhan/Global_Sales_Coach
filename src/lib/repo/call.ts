@@ -9,7 +9,7 @@ import type {
   Customer,
   OurSideInfo,
 } from "./types";
-import { getOrCreateUserId, isDbAvailable, LOCAL_USER_ID, localGetUser, localSaveUser } from "./storage";
+import { isDbAvailable, patchLocalUser, readLocalUser, resolveUid } from "./storage";
 
 /**
  * 模拟电话 repo：customers（档案库）/ calls（通话记录）/ call_reviews（四维度复盘）。
@@ -41,19 +41,18 @@ function rowToCustomer(row: Record<string, unknown>): Customer {
 export type NewCustomer = Omit<Customer, "id" | "userId" | "createdAt" | "updatedAt">;
 
 export async function createCustomer(data: NewCustomer, userId?: string): Promise<Customer> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   const now = new Date().toISOString();
   const customer: Customer = { id: randomUUID(), userId: uid, ...data, createdAt: now, updatedAt: now };
 
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       `INSERT INTO customers (id, user_id, name, country_market, role, main_product, history, pain_points, notes)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
       [
         customer.id,
-        dbUid,
+        uid,
         customer.name,
         customer.countryMarket,
         customer.role,
@@ -65,40 +64,38 @@ export async function createCustomer(data: NewCustomer, userId?: string): Promis
     );
     return rowToCustomer(rows[0]);
   }
-  const user = (await localGetUser(uid)) ?? { userId: uid };
-  await localSaveUser(uid, {
+  const user = await readLocalUser(uid);
+  await patchLocalUser(uid, {
     [CUSTOMERS_KEY]: [...((user[CUSTOMERS_KEY] as Customer[] | undefined) ?? []), customer],
   });
   return customer;
 }
 
 export async function listCustomers(userId?: string): Promise<Customer[]> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM customers WHERE user_id = $1 ORDER BY created_at DESC",
-      [dbUid],
+      [uid],
     );
     return rows.map(rowToCustomer);
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[CUSTOMERS_KEY] as Customer[] | undefined) ?? []).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 }
 
 export async function getCustomer(id: string, userId?: string): Promise<Customer | null> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM customers WHERE id = $1 AND user_id = $2",
-      [id, dbUid],
+      [id, uid],
     );
     return rows[0] ? rowToCustomer(rows[0]) : null;
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[CUSTOMERS_KEY] as Customer[] | undefined) ?? []).find((c) => c.id === id) ?? null;
 }
 
@@ -171,24 +168,23 @@ export async function createCall(input: NewCallInput): Promise<CallSession> {
     );
     return rowToCall(rows[0]);
   }
-  const user = (await localGetUser(input.userId)) ?? { userId: input.userId };
-  await localSaveUser(input.userId, {
+  const user = await readLocalUser(input.userId);
+  await patchLocalUser(input.userId, {
     [CALLS_KEY]: [...((user[CALLS_KEY] as CallSession[] | undefined) ?? []), session],
   });
   return session;
 }
 
 export async function getCall(id: string, userId?: string): Promise<CallSession | null> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM calls WHERE id = $1 AND user_id = $2",
-      [id, dbUid],
+      [id, uid],
     );
     return rows[0] ? rowToCall(rows[0]) : null;
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[CALLS_KEY] as CallSession[] | undefined) ?? []).find((c) => c.id === id) ?? null;
 }
 
@@ -197,22 +193,21 @@ export async function appendCallTurn(
   turn: CallTurn,
   userId?: string,
 ): Promise<CallSession | null> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   const call = await getCall(callId, uid);
   if (!call) return null;
   const updated: CallSession = { ...call, turns: [...call.turns, turn] };
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     await pool.query("UPDATE calls SET turns = $1 WHERE id = $2 AND user_id = $3", [
       JSON.stringify(updated.turns),
       callId,
-      dbUid,
+      uid,
     ]);
     return updated;
   }
-  const user = (await localGetUser(uid)) ?? { userId: uid };
+  const user = await readLocalUser(uid);
   const calls = (user[CALLS_KEY] as CallSession[] | undefined) ?? [];
-  await localSaveUser(uid, {
+  await patchLocalUser(uid, {
     [CALLS_KEY]: calls.map((c) => (c.id === callId ? updated : c)),
   });
   return updated;
@@ -223,7 +218,7 @@ export async function completeCall(
   transcript: string,
   userId?: string,
 ): Promise<CallSession | null> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   const call = await getCall(callId, uid);
   if (!call) return null;
   const updated: CallSession = {
@@ -233,46 +228,43 @@ export async function completeCall(
     endedAt: new Date().toISOString(),
   };
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     await pool.query(
       "UPDATE calls SET status = 'completed', transcript = $1, ended_at = now() WHERE id = $2 AND user_id = $3",
-      [transcript, callId, dbUid],
+      [transcript, callId, uid],
     );
     return updated;
   }
-  const user = (await localGetUser(uid)) ?? { userId: uid };
+  const user = await readLocalUser(uid);
   const calls = (user[CALLS_KEY] as CallSession[] | undefined) ?? [];
-  await localSaveUser(uid, {
+  await patchLocalUser(uid, {
     [CALLS_KEY]: calls.map((c) => (c.id === callId ? updated : c)),
   });
   return updated;
 }
 
 export async function listActiveCalls(userId?: string): Promise<CallSession[]> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM calls WHERE user_id = $1 AND status = 'active' ORDER BY started_at DESC",
-      [dbUid],
+      [uid],
     );
     return rows.map(rowToCall);
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[CALLS_KEY] as CallSession[] | undefined) ?? []).filter((c) => c.status === "active");
 }
 
 export async function listCompletedCalls(userId?: string): Promise<CallSession[]> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM calls WHERE user_id = $1 AND status = 'completed' ORDER BY started_at DESC",
-      [dbUid],
+      [uid],
     );
     return rows.map(rowToCall);
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[CALLS_KEY] as CallSession[] | undefined) ?? []).filter((c) => c.status === "completed");
 }
 
@@ -283,17 +275,17 @@ export async function saveCallReview(
   userId: string,
   review: CallReviewResult,
 ): Promise<void> {
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     await pool.query(
       `INSERT INTO call_reviews (call_id, user_id, review)
        VALUES ($1,$2,$3)`,
-      [callId, dbUid, JSON.stringify(review)],
+      [callId, uid, JSON.stringify(review)],
     );
     return;
   }
-  const user = (await localGetUser(userId)) ?? { userId };
-  await localSaveUser(userId, {
+  const user = await readLocalUser(uid);
+  await patchLocalUser(uid, {
     [CALL_REVIEWS_KEY]: [
       ...((user[CALL_REVIEWS_KEY] as { callId: string; review: CallReviewResult }[] | undefined) ?? []),
       { callId, review },
@@ -305,16 +297,15 @@ export async function getCallReview(
   callId: string,
   userId?: string,
 ): Promise<CallReviewResult | null> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT review FROM call_reviews WHERE call_id = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT 1",
-      [callId, dbUid],
+      [callId, uid],
     );
     return rows[0] ? (rows[0].review as CallReviewResult) : null;
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   const list = (user?.[CALL_REVIEWS_KEY] as { callId: string; review: CallReviewResult }[] | undefined) ?? [];
   const found = list.find((r) => r.callId === callId);
   return found ? found.review : null;

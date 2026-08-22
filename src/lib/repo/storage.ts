@@ -89,3 +89,30 @@ export async function getOrCreateUserId(): Promise<string> {
   cachedUserId = rows[0].id;
   return cachedUserId;
 }
+
+// ---- 公共辅助：消除 repo 层重复样板 ----
+
+/**
+ * 统一 userId fallback：本地模式用 LOCAL_USER_ID（"1"），DB 模式用真实 UUID。
+ * 取代各处散落的 `userId ?? LOCAL_USER_ID` 与 `userId ?? (await getOrCreateUserId())`，
+ * 避免两套 fallback 语义分裂导致的"查不到自己数据"类 bug。
+ */
+export async function resolveUid(userId?: string): Promise<string> {
+  if (userId) return userId;
+  if (await isDbAvailable()) return getOrCreateUserId();
+  return LOCAL_USER_ID;
+}
+
+/** 本地模式读取某用户数据（不存在返回带 userId 的空对象，省去每处 `?? {userId}`） */
+export async function readLocalUser(userId: string): Promise<Record<string, unknown>> {
+  return (await localGetUser(userId)) ?? { userId };
+}
+
+/** 本地模式合并写入某用户数据 */
+export async function patchLocalUser(
+  userId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const existing = await readLocalUser(userId);
+  await localSaveUser(userId, { ...existing, ...patch });
+}

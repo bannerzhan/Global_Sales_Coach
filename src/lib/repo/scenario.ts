@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { pool } from "../db";
 import type { Persona, Scenario } from "./types";
-import { getOrCreateUserId, isDbAvailable, LOCAL_USER_ID, localGetUser, localSaveUser } from "./storage";
+import { isDbAvailable, localGetUser, localSaveUser } from "./storage";
 
 /**
  * 演练场景 repo：createScenario / listScenarios / getScenario。

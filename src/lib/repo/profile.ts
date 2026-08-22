@@ -1,6 +1,6 @@
 import { pool } from "../db";
 import { DEFAULT_PROFILE, type Profile } from "./types";
-import { getOrCreateUserId, isDbAvailable, LOCAL_USER_ID, localGetUser, localSaveUser } from "./storage";
+import { isDbAvailable, patchLocalUser, readLocalUser, resolveUid } from "./storage";
 
 /**
  * 用户画像 repo：getProfile / saveProfile / isOnboarded。
@@ -23,13 +23,12 @@ function rowToProfile(row: Record<string, unknown>, userId: string): Profile {
 }
 
 export async function getProfile(userId?: string): Promise<Profile | null> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
-    const { rows } = await pool.query("SELECT * FROM profiles WHERE user_id = $1", [dbUid]);
-    return rows[0] ? rowToProfile(rows[0], dbUid) : null;
+    const { rows } = await pool.query("SELECT * FROM profiles WHERE user_id = $1", [uid]);
+    return rows[0] ? rowToProfile(rows[0], uid) : null;
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   const stored = user?.profile as Partial<Profile> | undefined;
   if (!stored) return null;
   return { userId: uid, ...DEFAULT_PROFILE, ...stored } as Profile;
@@ -39,26 +38,25 @@ export async function saveProfile(
   data: Omit<Profile, "userId" | "updatedAt">,
   userId?: string,
 ): Promise<Profile> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       `INSERT INTO profiles
-         (user_id, occupation, industry, markets, channels, daily_minutes, english_level, locale, timezone)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       ON CONFLICT (user_id) DO UPDATE SET
-         occupation = EXCLUDED.occupation,
-         industry = EXCLUDED.industry,
-         markets = EXCLUDED.markets,
-         channels = EXCLUDED.channels,
-         daily_minutes = EXCLUDED.daily_minutes,
-         english_level = EXCLUDED.english_level,
-         locale = EXCLUDED.locale,
-         timezone = EXCLUDED.timezone,
-         updated_at = now()
-       RETURNING *`,
+        (user_id, occupation, industry, markets, channels, daily_minutes, english_level, locale, timezone)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      ON CONFLICT (user_id) DO UPDATE SET
+        occupation = EXCLUDED.occupation,
+        industry = EXCLUDED.industry,
+        markets = EXCLUDED.markets,
+        channels = EXCLUDED.channels,
+        daily_minutes = EXCLUDED.daily_minutes,
+        english_level = EXCLUDED.english_level,
+        locale = EXCLUDED.locale,
+        timezone = EXCLUDED.timezone,
+        updated_at = now()
+      RETURNING *`,
       [
-        dbUid,
+        uid,
         data.occupation,
         data.industry,
         JSON.stringify(data.markets),
@@ -69,10 +67,10 @@ export async function saveProfile(
         data.timezone,
       ],
     );
-    return rowToProfile(rows[0], dbUid);
+    return rowToProfile(rows[0], uid);
   }
   const profile: Profile = { userId: uid, ...data, updatedAt: new Date().toISOString() };
-  await localSaveUser(uid, { profile });
+  await patchLocalUser(uid, { profile });
   return profile;
 }
 

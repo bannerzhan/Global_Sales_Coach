@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { pool } from "../db";
 import type { Goal } from "./types";
-import { getOrCreateUserId, isDbAvailable, LOCAL_USER_ID, localGetUser, localSaveUser } from "./storage";
+import { isDbAvailable, patchLocalUser, readLocalUser, resolveUid } from "./storage";
 
 /**
  * 学习目标 repo：listGoals / addGoal。
@@ -22,16 +22,15 @@ function rowToGoal(row: Record<string, unknown>, userId: string): Goal {
 }
 
 export async function listGoals(userId?: string): Promise<Goal[]> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM goals WHERE user_id = $1 AND status != 'abandoned' ORDER BY created_at",
-      [dbUid],
+      [uid],
     );
-    return rows.map((r) => rowToGoal(r, dbUid));
+    return rows.map((r) => rowToGoal(r, uid));
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.goals as Goal[] | undefined) ?? []).filter((g) => g.status !== "abandoned");
 }
 
@@ -39,16 +38,15 @@ export async function addGoal(
   data: { title: string; targetDate?: string | null },
   userId?: string,
 ): Promise<Goal> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       `INSERT INTO goals (user_id, title, target_date, status)
        VALUES ($1, $2, $3, 'active')
        RETURNING *`,
-      [dbUid, data.title, data.targetDate ?? null],
+      [uid, data.title, data.targetDate ?? null],
     );
-    return rowToGoal(rows[0], dbUid);
+    return rowToGoal(rows[0], uid);
   }
   const goal: Goal = {
     id: randomUUID(),
@@ -58,8 +56,8 @@ export async function addGoal(
     status: "active",
     createdAt: new Date().toISOString(),
   };
-  const user = (await localGetUser(uid)) ?? { userId: uid };
-  await localSaveUser(uid, {
+  const user = await readLocalUser(uid);
+  await patchLocalUser(uid, {
     goals: [...((user.goals as Goal[] | undefined) ?? []), goal],
   });
   return goal;

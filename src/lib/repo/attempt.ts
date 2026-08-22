@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { pool } from "../db";
 import type { Attempt, RoleplaySession, RoleplayTurn } from "./types";
-import { getOrCreateUserId, isDbAvailable, LOCAL_USER_ID, localGetUser, localSaveUser } from "./storage";
+import { isDbAvailable, patchLocalUser, readLocalUser, resolveUid } from "./storage";
 
 /**
  * 演练会话与记录 repo：roleplay session + attempts（双后端）。
@@ -29,7 +29,7 @@ export async function createRoleplaySession(
   openingTurn: RoleplayTurn,
   userId?: string,
 ): Promise<RoleplaySession> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   const session: RoleplaySession = {
     id: randomUUID(),
     userId: uid,
@@ -41,18 +41,16 @@ export async function createRoleplaySession(
   };
 
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       `INSERT INTO roleplay_sessions (id, user_id, scenario_id, status, turns)
        VALUES ($1, $2, $3, 'active', $4)
        RETURNING *`,
-      [session.id, dbUid, scenarioId, JSON.stringify(session.turns)],
+      [session.id, uid, scenarioId, JSON.stringify(session.turns)],
     );
-    return rowToSession(rows[0], dbUid);
+    return rowToSession(rows[0], uid);
   }
-  const user = (await localGetUser(uid)) ?? { userId: uid };
-  await localSaveUser(uid, {
-    [SESSIONS_KEY]: [...((user[SESSIONS_KEY] as RoleplaySession[] | undefined) ?? []), session],
+  await patchLocalUser(uid, {
+    [SESSIONS_KEY]: [...((await readLocalUser(uid))[SESSIONS_KEY] as RoleplaySession[] | undefined) ?? [], session],
   });
   return session;
 }
@@ -61,18 +59,17 @@ export async function getRoleplaySession(
   id: string,
   userId?: string,
 ): Promise<RoleplaySession | null> {
-  const uid = userId ?? LOCAL_USER_ID;
+  // DB 模式必须显式传 userId：不传则直接返回 null（拒绝用占位 id 误读他人数据）
+  if ((await isDbAvailable()) && !userId) return null;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    // DB 模式必须显式传 userId；不传则用本地占位 id（必然查不到），
-    // 避免 fallback 到 admin 用户导致误读他人演练数据
-    const dbUid = userId ?? LOCAL_USER_ID;
     const { rows } = await pool.query(
       "SELECT * FROM roleplay_sessions WHERE id = $1 AND user_id = $2",
-      [id, dbUid],
+      [id, uid],
     );
-    return rows[0] ? rowToSession(rows[0], dbUid) : null;
+    return rows[0] ? rowToSession(rows[0], uid) : null;
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[SESSIONS_KEY] as RoleplaySession[] | undefined) ?? []).find((s) => s.id === id) ?? null;
 }
 
@@ -81,22 +78,21 @@ export async function appendTurn(
   turn: RoleplayTurn,
   userId?: string,
 ): Promise<RoleplaySession | null> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   const session = await getRoleplaySession(sessionId, uid);
   if (!session) return null;
 
   const updated: RoleplaySession = { ...session, turns: [...session.turns, turn] };
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     await pool.query(
       "UPDATE roleplay_sessions SET turns = $1 WHERE id = $2 AND user_id = $3",
-      [JSON.stringify(updated.turns), sessionId, dbUid],
+      [JSON.stringify(updated.turns), sessionId, uid],
     );
     return updated;
   }
-  const user = (await localGetUser(uid)) ?? { userId: uid };
+  const user = await readLocalUser(uid);
   const sessions = (user[SESSIONS_KEY] as RoleplaySession[] | undefined) ?? [];
-  await localSaveUser(uid, {
+  await patchLocalUser(uid, {
     [SESSIONS_KEY]: sessions.map((s) => (s.id === sessionId ? updated : s)),
   });
   return updated;
@@ -106,7 +102,7 @@ export async function completeSession(
   sessionId: string,
   userId?: string,
 ): Promise<RoleplaySession | null> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   const session = await getRoleplaySession(sessionId, uid);
   if (!session) return null;
   const updated: RoleplaySession = {
@@ -115,48 +111,45 @@ export async function completeSession(
     endedAt: new Date().toISOString(),
   };
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     await pool.query(
       "UPDATE roleplay_sessions SET status = 'completed', ended_at = now() WHERE id = $1 AND user_id = $2",
-      [sessionId, dbUid],
+      [sessionId, uid],
     );
     return updated;
   }
-  const user = (await localGetUser(uid)) ?? { userId: uid };
+  const user = await readLocalUser(uid);
   const sessions = (user[SESSIONS_KEY] as RoleplaySession[] | undefined) ?? [];
-  await localSaveUser(uid, {
+  await patchLocalUser(uid, {
     [SESSIONS_KEY]: sessions.map((s) => (s.id === sessionId ? updated : s)),
   });
   return updated;
 }
 
 export async function listActiveSessions(userId?: string): Promise<RoleplaySession[]> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM roleplay_sessions WHERE user_id = $1 AND status = 'active' ORDER BY started_at DESC",
-      [dbUid],
+      [uid],
     );
-    return rows.map((r) => rowToSession(r, dbUid));
+    return rows.map((r) => rowToSession(r, uid));
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[SESSIONS_KEY] as RoleplaySession[] | undefined) ?? []).filter(
     (s) => s.status === "active",
   );
 }
 
 export async function listCompletedSessions(userId?: string): Promise<RoleplaySession[]> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM roleplay_sessions WHERE user_id = $1 AND status = 'completed' ORDER BY started_at DESC",
-      [dbUid],
+      [uid],
     );
-    return rows.map((r) => rowToSession(r, dbUid));
+    return rows.map((r) => rowToSession(r, uid));
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[SESSIONS_KEY] as RoleplaySession[] | undefined) ?? []).filter(
     (s) => s.status === "completed",
   );
@@ -183,7 +176,7 @@ export async function createAttempt(
   data: Omit<Attempt, "id" | "userId" | "createdAt">,
   userId?: string,
 ): Promise<Attempt> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   const attempt: Attempt = {
     id: randomUUID(),
     userId: uid,
@@ -192,15 +185,14 @@ export async function createAttempt(
   };
 
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       `INSERT INTO attempts
-         (id, user_id, scenario_id, task_type, user_input, evaluation, score, is_retry, attempt_no)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING *`,
+        (id, user_id, scenario_id, task_type, user_input, evaluation, score, is_retry, attempt_no)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      RETURNING *`,
       [
         attempt.id,
-        dbUid,
+        uid,
         attempt.scenarioId,
         attempt.taskType,
         attempt.userInput,
@@ -210,26 +202,25 @@ export async function createAttempt(
         attempt.attemptNo,
       ],
     );
-    return rowToAttempt(rows[0], dbUid);
+    return rowToAttempt(rows[0], uid);
   }
-  const user = (await localGetUser(uid)) ?? { userId: uid };
-  await localSaveUser(uid, {
+  const user = await readLocalUser(uid);
+  await patchLocalUser(uid, {
     [ATTEMPTS_KEY]: [...((user[ATTEMPTS_KEY] as Attempt[] | undefined) ?? []), attempt],
   });
   return attempt;
 }
 
 export async function listAttempts(userId?: string): Promise<Attempt[]> {
-  const uid = userId ?? LOCAL_USER_ID;
+  const uid = await resolveUid(userId);
   if (await isDbAvailable()) {
-    const dbUid = userId ?? (await getOrCreateUserId());
     const { rows } = await pool.query(
       "SELECT * FROM attempts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50",
-      [dbUid],
+      [uid],
     );
-    return rows.map((r) => rowToAttempt(r, dbUid));
+    return rows.map((r) => rowToAttempt(r, uid));
   }
-  const user = await localGetUser(uid);
+  const user = await readLocalUser(uid);
   return ((user?.[ATTEMPTS_KEY] as Attempt[] | undefined) ?? []).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
