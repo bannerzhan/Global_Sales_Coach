@@ -164,7 +164,7 @@ export default async function HomePage() {
             </p>
           </a>
           <a
-            href="/practice"
+            href={due[0] ? `/practice?focus=${due[0].skillId}` : "/practice"}
             className="rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-teal-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-teal-800"
           >
             <div className="text-2xl">⏱️</div>
@@ -172,7 +172,9 @@ export default async function HomePage() {
               每日一练
             </h3>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              基于 FSRS 排期，自动推送该练的技能
+              {due[0]
+                ? `今日该练：${skillById(due[0].skillId)?.name ?? due[0].skillId}`
+                : "基于 FSRS 排期，自动推送该练的技能"}
             </p>
           </a>
         </div>
