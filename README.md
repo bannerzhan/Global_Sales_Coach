@@ -14,7 +14,9 @@
 - **待复习 → 专项演练闭环**：首页列出「该复习的技能」，点击即生成**只围绕该技能**的专项演练，集中突破薄弱点。
 - **13 维技能图谱**：沟通表达 / 推进成交 / 信任建立 三大维度共 13 项底层技能，掌握度由 FSRS 稳定性派生。
 - **零数据库也能跑**：本机无 PostgreSQL 时自动降级为本地 JSON 存储，开发与演示零依赖。
-- **生产级部署**：Docker Compose（PostgreSQL + pgvector + App + Caddy）一键起，Caddy 自动签发 Let's Encrypt HTTPS。
+- **模拟电话（真实语音对话）**：独立 `/calls` 模块，AI 扮演客户与你**实时语音通话**——按住说话、实时字幕、AI 语音播报。后端用独立 WS 网关串起「火山流式 ASR → 方舟 LLM → 火山流式 TTS」三段流式，密钥全在后端，无 key 时优雅降级为文字回声，方便无凭据联调。
+- **全站 AI 文本翻译**：所有 AI 文字块（场景/客户话术/复盘/评估）一键「译」，整段中文/英文互译，点击展开，不喧宾夺主。
+- **生产级部署**：Docker Compose（PostgreSQL + pgvector + App + 语音网关 + Caddy）一键起，Caddy 自动签发 Let's Encrypt HTTPS。
 
 ---
 
@@ -51,9 +53,10 @@ flowchart LR
 | 鉴权 | Auth.js v5（`next-auth@beta`，单用户 Credentials + JWT 会话） |
 | 数据库 | PostgreSQL 16 + pgvector（Docker），本地开发降级为 JSON |
 | 大模型 | 火山方舟 Ark（OpenAI 兼容），`doubao-seed-2.1-pro` / `doubao-seed-2.1-turbo` 双档 |
+| 语音 | 独立 WS 网关（`voice-gateway/`，Node + `ws`）：火山流式 ASR（`volc.bigasr.sauc.async`）+ 方舟 LLM + 火山流式 TTS（`seed-tts-2.0`），三段流式；浏览器经 Caddy 反代 `wss://host/voice-ws` 接入 |
 | 复习算法 | FSRS-4.5（自实现纯函数引擎 `src/lib/fsrs.ts`，17 参数官方默认权重） |
 | 样式 | Tailwind CSS 4 |
-| 部署 | Docker Compose + Caddy（自动 HTTPS） |
+| 部署 | Docker Compose + Caddy（自动 HTTPS，含语音网关反代） |
 
 ---
 
@@ -77,13 +80,28 @@ global-sales-coach/
 │   │   ├── proxy.ts         # Next 16 路由守卫
 │   │   ├── db.ts            # PG 连接池 + 健康检查
 │   │   ├── fsrs.ts          # FSRS-4.5 纯函数引擎
-│   │   ├── llm/             # provider / contract(契约链) / scenario-gen / roleplay-reply / review / accounting
-│   │   └── repo/            # 数据访问层（DB/本地双后端）：profile/goal/scenario/attempt/skills/skill-state
+│   │   ├── voice-client.ts  # 浏览器端 WS 语音客户端（PCM 采集 + PTT + 字幕回调）
+│   │   ├── llm/             # provider / contract(契约链) / scenario-gen / roleplay-reply / review / accounting / translate / call-script / call-reply / call-review
+│   │   └── repo/            # 数据访问层（DB/本地双后端）：profile/goal/scenario/attempt/skills/skill-state/call
+│   ├── components/
+│   │   ├── translate-block.tsx   # AI 文字块翻译按钮（整段互译，点击展开）
+│   │   ├── translate-box.tsx     # 输入框上方翻译小框（识别方向/填入光标处）
+│   │   ├── voice-input-button.tsx # 按住说话 PTT（连网关 dialogue，实时字幕）
+│   │   └── voice-play-button.tsx  # AI 语音播报（连网关 tts 流式播放）
 │   └── env.ts               # 环境变量 Zod 校验
+├── voice-gateway/           # 独立语音 WS 网关（Node + ws，避开 Next route.ts 不支持 WS upgrade）
+│   ├── src/
+│   │   ├── server.ts        # WS 服务，按首帧 type 分流 transcribe / dialogue / tts
+│   │   ├── adapters/        # asr.ts（火山流式） / llm.ts（方舟） / tts.ts（火山流式）
+│   │   ├── protocol/gip.ts  # 火山 ASR 二进制帧编解码（payload type/seq/size/gzip）
+│   │   └── ws.d.ts          # 本地 ws 类型声明（本机 @types/ws 写保护，无法 npm 安装）
+│   ├── Dockerfile           # 独立镜像（ws + tsx 运行）
+│   └── tsconfig.json
 ├── scripts/                 # 冒烟与单测（见下）
 ├── docker-compose.yml       # db + app + caddy
+├── docker-compose.routec.yml # Route C 部署（自签证书 + 语音网关 + 3443 反代）
 ├── Dockerfile               # 多阶段构建（standalone）
-├── Caddyfile                # 反向代理 + 自动 HTTPS
+├── Caddyfile.selfsigned     # Route C 反代（含 /voice-ws WS 反代到语音网关）
 ├── deploy.sh                # 一键部署脚本
 └── .env.example             # 环境变量模板
 ```
@@ -122,6 +140,10 @@ npm run dev
 | `ARK_BASE_URL` | 默认 `https://ark.cn-beijing.volces.com/api/v3` |
 | `ARK_ENDPOINT_PRO` / `ARK_ENDPOINT_TURBO` | 推理接入点 ID（pro 用于复盘，turbo 用于场景/扮演） |
 | `ARK_MODEL_PRO` / `ARK_MODEL_TURBO` | 模型名，默认 `doubao-seed-2.1-pro/turbo-260628` |
+| `VOICE_API_KEY` | 火山**语音**控制台（console.volcengine.com/speech）的 X-Api-Key，用于流式 ASR + 流式 TTS。**与方舟 ARK key 不是同一个**。留空时语音网关降级为文字回声，应用仍可运行 |
+| `VOICE_ASR_RESOURCE` | ASR 资源 ID，默认 `volc.bigasr.sauc.async`（流式 bigmodel_async） |
+| `VOICE_TTS_RESOURCE` | TTS 资源 ID，默认 `seed-tts-2.0`（流式 bidirection） |
+| `VOICE_GATEWAY_PORT` | 语音网关监听端口，默认 `8787`（容器内） |
 | `DATABASE_URL` | 本地开发默认即可；部署时由 compose 注入 |
 | `POSTGRES_PASSWORD` | 本地 dev 密码，部署时 `deploy.sh` 自动替换为随机值 |
 | `AUTH_SECRET` | `openssl rand -base64 32` 生成 |
@@ -146,7 +168,25 @@ bash deploy.sh your-domain.com     # 自动替换域名、生成随机 DB 密码
 
 `deploy.sh` 会：检查依赖 → 校验 `.env` → 生成随机 `POSTGRES_PASSWORD` → 注入域名到 Caddyfile → `docker compose up -d --build` → 等待健康检查。完成后访问 `https://your-domain.com`。
 
-服务拓扑：`gsc-db`（PostgreSQL+pgvector）→ `gsc-app`（Next standalone，内网 3000）→ `gsc-caddy`（80/443，反代 + Let's Encrypt 自动证书）。
+服务拓扑：`gsc-db`（PostgreSQL+pgvector）→ `gsc-app`（Next standalone，内网 3000）→ `gsc-voice-gateway`（语音 WS 网关，内网 8787）→ `gsc-caddy`（80/443，反代 Web + `/voice-ws` WS + Let's Encrypt 自动证书）。
+
+### 语音网关（独立进程说明）
+
+浏览器无法直接连 Next route（Turbopack 不支持原生 WebSocket `upgrade`），因此语音走**独立 WS 网关**进程，由 Caddy 把同源的 `wss://host/voice-ws` 反代到网关 8787。
+
+- 网关按客户端首帧 JSON 的 `type` 分流三种会话：
+  - `transcribe`：纯语音转文字（ASR）；
+  - `dialogue`：ASR → 方舟 LLM → TTS 三段流式（AI 实时语音对话，支持 `systemPrompt` 注入销售教练人设）；
+  - `tts`：纯文字 → 语音合成（AI 播报）。
+- 无 `VOICE_API_KEY` 时，网关优雅降级（ASR 返回占位、LLM 走 echo、TTS 返回静音/跳过），保证握手与协议帧可联调。
+- 密钥**只存在后端**（网关进程 / 服务器 `.env`），前端不持有任何语音 key。
+
+本地独立启动网关（开发调试用，无需 Docker）：
+
+```bash
+VOICE_API_KEY= ARK_API_KEY= PORT=8787 \
+  node ./node_modules/tsx/dist/cli.mjs voice-gateway/src/server.ts
+```
 
 ---
 
@@ -173,6 +213,9 @@ bash deploy.sh your-domain.com     # 自动替换域名、生成随机 DB 密码
 - [x] FSRS-4.5 复习调度（替换简化版）
 - [x] 待复习驱动的专项演练闭环
 - [x] **V0.1 DoD 补强**：基线评估（3 聚合维度）、成本护栏全字段记账+告警、PWA 可安装、反幻觉策略（feedback_language/feedback_business 分离 + 专项测试）
+- [x] **全站 AI 文本翻译**：所有 AI 文字块一键中英互译（整段展开，不打扰阅读）
+- [x] **模拟电话（真实语音对话）**：独立 `/calls` 模块 + 独立语音 WS 网关（火山流式 ASR + 方舟 LLM + 火山流式 TTS 三段流式），无 key 降级跑通
+- [ ] **语音网关生产联调**：申请 `VOICE_API_KEY` 后，逐字节对照官方协议联调 ASR GIP 帧与 TTS bidirection 帧（代码已用 ⚠️ 标出待核点）
 - [ ] **生产部署到香港轻量服务器**（部署体系已就绪，待服务器凭据）
 - [ ] **memories 向量记忆**（pgvector 表已建，待 embedding 接入点）
 - [ ] **FSRS 训练器**（用真实复习历史微调权重）

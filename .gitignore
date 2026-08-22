@@ -58,3 +58,6 @@ build_err.txt
 
 # 自签证书（服务器生成，勿提交）
 selfsigned/
+
+# WorkBuddy 项目记忆（本地，勿提交）
+.workbuddy/

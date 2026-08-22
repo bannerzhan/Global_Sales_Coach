@@ -1,77 +1,93 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { VoiceClient } from "@/lib/voice-client";
 
 /**
- * AI 回复朗读：优先浏览器原生 TTS（speechSynthesis，免费无 key 国内可用），
- * 失败/不可用时回退服务端火山 TTS（/api/voice/tts，需 VOICE_API_KEY）。
+ * AI 回复朗读：连后端 WS 语音网关的 tts 会话（纯文字→音频流），
+ * 替代原浏览器原生 speechSynthesis（音色/语气不可控、中文生硬）。
+ * 音频流（mp3 base64 包）边收边播；AI 播报中按钮置灰，避免重叠。
  */
 export function VoicePlayButton({ text, disabled }: { text: string; disabled?: boolean }) {
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const queueRef = useRef<AudioBuffer[]>([]);
+  const playingRef = useRef(false);
 
-  /** 原生 TTS；返回 false 表示不可用 */
-  function speakNative(): boolean {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
-    const synth = window.speechSynthesis;
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    const isZh = /[\u4e00-\u9fff]/.test(text);
-    const voices = synth.getVoices();
-    const v =
-      voices.find((x) => x.lang.toLowerCase().startsWith(isZh ? "zh" : "en")) ??
-      voices.find((x) => x.lang.toLowerCase().startsWith(isZh ? "en" : "zh")) ??
-      voices[0];
-    if (v) u.voice = v;
-    u.rate = 0.95;
-    u.onend = () => setPlaying(false);
-    u.onerror = () => setPlaying(false);
-    synth.speak(u);
-    return true;
+  async function playMp3(base64: string) {
+    const ctx = audioCtxRef.current!;
+    const buf = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const audioBuf = await ctx.decodeAudioData(buf.buffer.slice(0));
+    queueRef.current.push(audioBuf);
+    if (!playingRef.current) drain();
+  }
+
+  function drain() {
+    const ctx = audioCtxRef.current!;
+    const next = queueRef.current.shift();
+    if (!next) {
+      playingRef.current = false;
+      return;
+    }
+    playingRef.current = true;
+    const src = ctx.createBufferSource();
+    src.buffer = next;
+    src.onended = () => drain();
+    src.connect(ctx.destination);
+    src.start();
   }
 
   async function toggle() {
     setError("");
-    if (playing) {
-      window.speechSynthesis?.cancel();
-      audioRef.current?.pause();
+    if (playing || busy) {
+      // 停止
+      queueRef.current = [];
+      playingRef.current = false;
+      audioCtxRef.current?.close().catch(() => {});
+      audioCtxRef.current = null;
       setPlaying(false);
       return;
     }
-    if (disabled || busy) return;
-
-    // 1) 原生 TTS（立即可用）
-    if (speakNative()) {
-      setPlaying(true);
-      return;
-    }
-    // 2) 服务端火山 TTS（配置了 VOICE_API_KEY 时）
+    if (disabled) return;
     setBusy(true);
     try {
-      const res = await fetch("/api/voice/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      }).then((r) => r.json());
-      if (!res.ok || !res.audioBase64) {
-        setError(res.error ?? "语音合成失败");
-        return;
-      }
-      const a = audioRef.current ?? new Audio();
-      audioRef.current = a;
-      a.src = `data:audio/mpeg;base64,${res.audioBase64}`;
-      a.onended = () => setPlaying(false);
-      a.onerror = () => {
-        setPlaying(false);
-        setError("播放失败");
-      };
-      await a.play();
+      audioCtxRef.current = new AudioContext();
+      const client = new VoiceClient({
+        onTtsAudio: (b64) => playMp3(b64),
+        onTtsDone: () => {
+          setPlaying(false);
+          setBusy(false);
+        },
+        onError: (e) => {
+          setError(e);
+          setBusy(false);
+          setPlaying(false);
+        },
+      });
+      // 连网关 tts 会话并发送文本
+      await new Promise<void>((resolve, reject) => {
+        const ws = new WebSocket(
+          location.protocol === "https:" ? "wss://" + location.host + "/voice-ws" : "ws://" + location.host + "/voice-ws",
+        );
+        (client as any).ws = ws;
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ type: "tts", text }));
+          resolve();
+        };
+        ws.onerror = () => reject(new Error("语音网关连接失败"));
+        ws.onmessage = (ev) => {
+          let m: any;
+          try { m = JSON.parse(ev.data); } catch { return; }
+          if (m.type === "tts_audio") playMp3(m.data);
+          else if (m.type === "tts_done") { setPlaying(false); setBusy(false); ws.close(); }
+          else if (m.type === "error") { setError(m.message); setBusy(false); setPlaying(false); }
+        };
+      });
       setPlaying(true);
-    } catch {
-      setError("语音合成失败，请稍后重试");
-    } finally {
+    } catch (e) {
+      setError((e as Error).message);
       setBusy(false);
     }
   }
@@ -81,8 +97,8 @@ export function VoicePlayButton({ text, disabled }: { text: string; disabled?: b
       <button
         type="button"
         onClick={toggle}
-        disabled={disabled || busy}
-        className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition disabled:opacity-40 ${
+        disabled={disabled}
+        className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition ${
           playing
             ? "bg-teal-600 text-white"
             : "border border-zinc-300 bg-white text-zinc-600 hover:border-teal-400 hover:text-teal-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"

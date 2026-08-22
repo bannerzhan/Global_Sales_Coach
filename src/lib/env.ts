@@ -38,7 +38,7 @@ const envSchema = z.object({
 
   // 火山语音（ASR/TTS，独立产品线 openspeech.bytedance.com，key 与方舟 ARK key 不同）
   VOICE_API_KEY: z.string().optional(),
-  VOICE_ASR_RESOURCE_ID: z.string().default("volc.bigasr.auc_turbo"),
+  VOICE_ASR_RESOURCE_ID: z.string().default("volc.bigasr.sauc.async"),
   VOICE_TTS_RESOURCE_ID: z.string().default("seed-tts-2.0"),
   VOICE_TTS_SPEAKER: z.string().default("zh_female_gaolengyujie_uranus_bigtts"),
 });

@@ -1,181 +1,132 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { VoiceClient } from "@/lib/voice-client";
 
 /**
- * 语音输入：MediaRecorder 录音 → 本地 Whisper（transformers.js，浏览器内推理，
- * 免费无 key、国内可用、隐私好）→ 失败兜底服务端火山 ASR（/api/voice/asr）。
- * 模型从 hf-mirror.com 镜像加载（Xenova/whisper-base，约 40MB，首次加载缓存）。
- * 仅 secure context（HTTPS/localhost）可用（getUserMedia 限制）。
+ * 语音输入（PTT 按住说话）：
+ *  - 连接后端 WS 语音网关（/voice-ws，Caddy 反代到独立网关进程 8787）
+ *  - 按住录音 → 16k 单声道 PCM 实时推流 → 网关 ASR 识别 → onText 回调最终文本
+ *  - 松手=本句结束；按住滑出按钮外再松=取消本句（不提交）
+ *  - 不再使用浏览器端 Whisper（合规：音频不出端、密钥在后端）
+ *
+ * systemPrompt 用于把销售教练人设/客户档案注入 LLM（dialogue 模式下 AI 会语音回复）。
+ * 若只需纯转文字（transcribe），传 useDialogue=false。
  */
-
-// Whisper 单例（跨组件复用，避免重复下载/加载模型）
-let whisperPipeline: any = null;
-let whisperLoading: Promise<any> | null = null;
-
-async function loadWhisper() {
-  if (whisperPipeline) return whisperPipeline;
-  if (!whisperLoading) {
-    whisperLoading = (async () => {
-      const { env, pipeline } = await import("@huggingface/transformers");
-      // 国内镜像（huggingface.co 被墙）
-      env.remoteHost = "https://hf-mirror.com";
-      whisperPipeline = await pipeline("automatic-speech-recognition", "Xenova/whisper-base");
-      return whisperPipeline;
-    })().catch((e) => {
-      whisperLoading = null;
-      throw e;
-    });
-  }
-  return whisperLoading;
-}
-
 export function VoiceInputButton({
   onText,
   disabled,
+  systemPrompt,
+  useDialogue = false,
 }: {
   onText: (text: string) => void;
   disabled?: boolean;
+  systemPrompt?: string;
+  useDialogue?: boolean;
 }) {
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState(""); // 识别中/加载模型中…
+  const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const clientRef = useRef<VoiceClient | null>(null);
+  const cancelingRef = useRef(false);
 
   const secure = typeof window !== "undefined" && window.isSecureContext;
 
-  function blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        resolve(result.split(",")[1] ?? "");
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  async function recognize(blob: Blob) {
-    // 1) 本地 Whisper（免费稳定）
-    setStatus("加载语音模型…");
-    try {
-      const asr = await loadWhisper();
-      setStatus("识别中…");
-      const out = await asr(blob, { task: "transcribe" });
-      const text = (out?.text ?? "").trim();
-      if (text) {
-        onText(text);
-        setStatus("");
-        return;
-      }
-      setStatus("");
-      setError("没听清，请再试一次");
-      return;
-    } catch (e) {
-      console.warn("[voice] 本地 Whisper 失败，回退火山 ASR:", (e as Error).message);
-    }
-    // 2) 兜底：火山 ASR（配置 VOICE_API_KEY 时）
-    setStatus("服务端识别中…");
-    try {
-      const b64 = await blobToBase64(blob);
-      const res = await fetch("/api/voice/asr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audioBase64: b64, format: "webm" }),
-      }).then((r) => r.json());
-      if (res.ok && res.text) {
-        onText(res.text);
-        setStatus("");
-      } else {
-        setStatus("");
-        setError(res.error ?? "语音识别不可用（本地模型加载失败且未配置语音服务）");
-      }
-    } catch {
-      setStatus("");
-      setError("语音识别失败，请稍后重试");
-    }
-  }
-
-  async function stopAndRecognize() {
-    const rec = recorderRef.current;
-    if (!rec || rec.state !== "recording") return;
-    setBusy(true);
-    const stopPromise = new Promise<void>((resolve) => {
-      rec.onstop = () => resolve();
-    });
-    rec.stop();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    await stopPromise;
-
-    const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-    chunksRef.current = [];
-    setRecording(false);
-    if (blob.size < 1000) {
-      setError("录音太短，请再试一次");
-      setBusy(false);
-      return;
-    }
-    await recognize(blob);
-    setBusy(false);
-  }
-
-  async function toggle() {
+  async function start() {
     setError("");
-    setStatus("");
-    if (recording) {
-      await stopAndRecognize();
-      return;
-    }
     if (disabled || busy) return;
     if (!secure) {
-      setError("浏览器禁止在非 HTTPS 下录音，请通过 https://82.157.183.237:3443 访问");
+      setError("浏览器禁止在非 HTTPS 下录音，请通过 https 访问");
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const rec = new MediaRecorder(stream);
-      chunksRef.current = [];
-      rec.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      recorderRef.current = rec;
-      rec.start();
+      setBusy(true);
+      setStatus("连接语音服务…");
+      const client = new VoiceClient({
+        onFinal: (t) => {
+          if (!cancelingRef.current && t && !t.startsWith("[降级]")) {
+            onText(t);
+          }
+        },
+        onError: (e) => setError(e),
+        onInfo: (m) => setStatus(m),
+      });
+      await client.connect(useDialogue ? "dialogue" : "transcribe", systemPrompt);
+      clientRef.current = client;
+      await client.startCapture();
       setRecording(true);
-    } catch {
-      setError("无法访问麦克风（请检查浏览器授权）");
+      setBusy(false);
+      setStatus("说话中…（松手发送，滑出取消）");
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+      setRecording(false);
     }
+  }
+
+  function stop(send: boolean) {
+    const client = clientRef.current;
+    if (!client) return;
+    if (send) client.endUtterance();
+    else client.cancelUtterance();
+    client.stopCapture();
+    clientRef.current = null;
+    setRecording(false);
+    setStatus("");
+  }
+
+  // 按住
+  function onPointerDown(e: React.PointerEvent) {
+    e.preventDefault();
+    cancelingRef.current = false;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    start();
+  }
+  // 移动：滑出按钮区域 → 取消
+  function onPointerMove(e: React.PointerEvent) {
+    if (!recording) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const outside =
+      e.clientX < rect.left - 8 || e.clientX > rect.right + 8 ||
+      e.clientY < rect.top - 8 || e.clientY > rect.bottom + 8;
+    cancelingRef.current = outside;
+    setStatus(outside ? "松手取消…" : "说话中…（松手发送，滑出取消）");
+  }
+  function onPointerUp() {
+    if (!recording) return;
+    stop(!cancelingRef.current);
   }
 
   return (
     <div className="flex flex-col items-end gap-1">
       <button
         type="button"
-        onClick={toggle}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={() => recording && (cancelingRef.current = true)}
         disabled={disabled || busy}
-        title={secure ? "语音输入" : "需 HTTPS 才能录音"}
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg transition ${
+        title={secure ? "按住说话" : "需 HTTPS 才能录音"}
+        className={`flex h-10 w-10 shrink-0 select-none items-center justify-center rounded-xl text-lg transition ${
           recording
-            ? "animate-pulse bg-red-500 text-white"
+            ? cancelingRef.current
+              ? "bg-zinc-400 text-white"
+              : "animate-pulse bg-red-500 text-white"
             : "border border-zinc-300 bg-white text-zinc-600 hover:border-teal-400 hover:text-teal-600 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400"
         }`}
       >
         {busy ? (
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-teal-600" />
         ) : recording ? (
-          "⏺"
+          "🎙"
         ) : (
           "🎤"
         )}
       </button>
-      {busy && <span className="text-xs text-teal-600">{status}</span>}
-      {error && (
-        <span className="max-w-[220px] text-right text-xs text-red-500">{error}</span>
-      )}
+      {busy && !recording && <span className="text-xs text-teal-600">{status}</span>}
+      {recording && <span className="max-w-[200px] text-right text-xs text-teal-600">{status}</span>}
+      {error && <span className="max-w-[220px] text-right text-xs text-red-500">{error}</span>}
     </div>
   );
 }

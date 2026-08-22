@@ -10,5 +10,7 @@
 
 :443 {
 	tls /etc/caddy/selfsigned.crt /etc/caddy/selfsigned.key
+	# 语音网关 WebSocket（独立进程，前端经同源 /voice-ws 连，避开 Next route.ts 不支持 upgrade）
+	reverse_proxy /voice-ws voice-gateway:8787
 	reverse_proxy app:3000
 }

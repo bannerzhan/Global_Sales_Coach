@@ -71,12 +71,33 @@ services:
     ports:
       - "3000:3000"
 
+  voice-gateway:
+    build:
+      context: .
+      dockerfile: voice-gateway/Dockerfile
+    container_name: gsc-voice-gateway
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      NODE_ENV: production
+      VOICE_GATEWAY_PORT: 8787
+      # 密钥后端存，前端不接触
+      VOICE_API_KEY: ${VOICE_API_KEY:-}
+      ARK_API_KEY: ${ARK_API_KEY:?请在 .env 中设置 ARK_API_KEY}
+      ARK_BASE_URL: ${ARK_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}
+      ARK_ENDPOINT_FLASH: ${ARK_ENDPOINT_FLASH:?请在 .env 中设置 ARK_ENDPOINT_FLASH}
+      ARK_MODEL_FLASH: ${ARK_MODEL_FLASH:-deepseek-v4-flash}
+    expose:
+      - "8787"
+
   caddy:
     image: caddy:2-alpine
     container_name: gsc-caddy
     restart: unless-stopped
     depends_on:
       - app
+      - voice-gateway
     ports:
       - "3443:443"
     volumes:
