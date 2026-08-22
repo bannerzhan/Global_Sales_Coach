@@ -24,7 +24,9 @@ export default async function HomePage() {
 
   const profile = await getProfile(uid);
   const goals = await listGoals(uid);
-  const due = await dueSkillStates(uid);
+  const due = (await dueSkillStates(uid)).sort(
+    (a, b) => new Date(a.nextReview ?? 0).getTime() - new Date(b.nextReview ?? 0).getTime(),
+  );
   const states = await listSkillStates(uid);
   const baseline = await getLatestBaseline(uid);
 
