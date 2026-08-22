@@ -5,8 +5,6 @@ import { listSkillStates } from "@/lib/repo/skill-state";
 import { SKILLS, DIMENSION_LABEL, type SkillDef } from "@/lib/repo/skills";
 import type { SkillState } from "@/lib/repo/skills";
 import { SignOutButton } from "../sign-out-button";
-import { LanguageToggle } from "@/components/LanguageToggle";
-import { getProfile } from "@/lib/repo/profile";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -59,7 +57,6 @@ export default async function SkillsPage() {
   const onboarded = await isOnboarded(uid);
   if (!onboarded) redirect("/onboarding");
 
-  const profile = await getProfile(uid);
   const states = await listSkillStates(uid);
   const stateMap = new Map(states.map((s) => [s.skillId, s]));
 
@@ -100,7 +97,6 @@ export default async function SkillsPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <LanguageToggle locale={profile?.locale ?? "zh-CN"} />
             <SignOutButton />
           </div>
         </div>

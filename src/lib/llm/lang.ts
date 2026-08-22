@@ -1,15 +1,14 @@
 /**
  * 练习语言工具。
- * locale 取值："zh-CN"（中文，默认）/ "en"（英文）。
- * 仅控制「AI 生成内容」的语言（场景 / AI 客户 / 复盘 / 评估 / 目标建议），
- * 应用外壳（菜单/按钮）保持中文。
+ * 本产品专注英文销售训练，所有 AI 生成内容（场景 / AI 客户 / 复盘 / 评估 / 目标建议）固定为英文。
+ * 应用外壳（菜单/按钮）当前仍显示中文。
  */
 
 export type Lang = "zh" | "en";
 
-/** 把 profile/scenario 上的 locale 归一成 Lang */
-export function langOf(locale?: string | null): Lang {
-  return locale === "en" ? "en" : "zh";
+/** 统一固定为英文，忽略历史 profile/scenario 中可能残留的 locale 值 */
+export function langOf(_locale?: string | null): Lang {
+  return "en";
 }
 
 /** 统一的「输出语言」指令行，注入各 prompt 末尾 */

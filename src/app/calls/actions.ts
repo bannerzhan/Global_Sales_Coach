@@ -52,7 +52,7 @@ export async function createCall(input: CreateCallInput): Promise<{ ok: boolean;
   if (!customer) return { ok: false, error: "客户信息缺失，请填写或选择客户" };
 
   const profile = await getProfile(uid);
-  const locale = profile?.locale ?? "zh-CN";
+  const locale = profile?.locale ?? "en";
 
   const script = await generateCallScript({
     customer,
@@ -106,7 +106,7 @@ export async function callSendMessage(
     latestUserMessage: text,
     userId: uid,
     sessionId: callId,
-    locale: (await getProfile(uid))?.locale ?? "zh-CN",
+    locale: (await getProfile(uid))?.locale ?? "en",
   });
 
   if (!reply.ok || !reply.reply) {
@@ -142,7 +142,7 @@ export async function finishCall(callId: string) {
     turns: call.turns,
     userId: uid,
     callId,
-    locale: (await getProfile(uid))?.locale ?? "zh-CN",
+    locale: (await getProfile(uid))?.locale ?? "en",
   });
 
   if (review.ok && review.data && !review.degraded) {
@@ -165,7 +165,7 @@ export async function retryCallReview(callId: string): Promise<{ ok: boolean; er
     turns: call.turns,
     userId: uid,
     callId,
-    locale: (await getProfile(uid))?.locale ?? "zh-CN",
+    locale: (await getProfile(uid))?.locale ?? "en",
   });
   if (!review.ok || !review.data) return { ok: false, error: "复盘失败，请重试" };
   if (review.degraded) return { ok: false, error: "AI 暂时繁忙，复盘未生成，请稍后再试" };

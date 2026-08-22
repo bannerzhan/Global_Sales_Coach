@@ -110,11 +110,3 @@ export async function submitAssessment(input: {
   redirect("/");
 }
 
-/** 切换演练语言（首页开关用）："zh-CN" | "en" */
-export async function setLocale(locale: string) {
-  const normalized = locale === "en" ? "en" : "zh-CN";
-  const uid = (await auth())?.user?.id;
-  const profile = await getProfile(uid);
-  if (!profile) return;
-  await saveProfile({ ...profile, locale: normalized }, uid);
-}

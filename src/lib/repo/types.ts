@@ -50,7 +50,7 @@ export const DEFAULT_PROFILE = {
   channels: [] as string[],
   dailyMinutes: 30,
   englishLevel: {},
-  locale: "zh-CN",
+  locale: "en",
   timezone: "Asia/Shanghai",
 };
 

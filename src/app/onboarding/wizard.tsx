@@ -30,12 +30,6 @@ type SelfRatings = Record<(typeof ASSESS_DIMS)[number]["key"], number>;
 
 const STEPS = ["基本信息", "投入与水平", "学习目标", "能力自评"] as const;
 
-/** 演练语言选项（控制 AI 客户 / 复盘 / 评估 / 目标建议的语言） */
-const LOCALE_OPTIONS = [
-  { value: "zh-CN", label: "中文" },
-  { value: "en", label: "English" },
-] as const;
-
 const EMPTY_PROFILE: ProfileInput = {
   occupation: "",
   industry: "",
@@ -43,7 +37,7 @@ const EMPTY_PROFILE: ProfileInput = {
   channels: [],
   dailyMinutes: 30,
   englishLevel: {},
-  locale: "zh-CN",
+  locale: "en",
   timezone: "Asia/Shanghai",
 };
 
@@ -165,33 +159,6 @@ export function OnboardingWizard() {
                 )
               }
             />
-            <div>
-              <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                演练语言
-              </label>
-              <div className="flex gap-2">
-                {LOCALE_OPTIONS.map((opt) => {
-                  const active = (profile.locale ?? "zh-CN") === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => set("locale", opt.value)}
-                      className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                        active
-                          ? "bg-teal-600 text-white shadow-sm"
-                          : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="mt-1.5 text-xs text-zinc-400">
-                选择 AI 客户与教练反馈所用的语言（中文 / 英文）
-              </p>
-            </div>
           </div>
         )}
 

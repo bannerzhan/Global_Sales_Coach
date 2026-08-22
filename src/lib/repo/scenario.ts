@@ -24,7 +24,7 @@ function rowToScenario(row: Record<string, unknown>): Scenario {
       : [],
     workContextSeed: (row.work_context_seed as string | null) ?? null,
     openingLine: (row.opening_line as string) ?? "",
-    locale: (row.locale as string) ?? "zh-CN",
+    locale: (row.locale as string) ?? "en",
     createdAt: new Date((row.created_at as string) ?? Date.now()).toISOString(),
   };
 }

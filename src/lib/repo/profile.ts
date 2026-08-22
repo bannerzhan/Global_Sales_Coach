@@ -16,7 +16,7 @@ function rowToProfile(row: Record<string, unknown>, userId: string): Profile {
     channels: Array.isArray(row.channels) ? (row.channels as string[]) : [],
     dailyMinutes: Number(row.daily_minutes ?? 30),
     englishLevel: (row.english_level as Profile["englishLevel"]) ?? {},
-    locale: (row.locale as string) ?? "zh-CN",
+    locale: (row.locale as string) ?? "en",
     timezone: (row.timezone as string) ?? "Asia/Shanghai",
     updatedAt: new Date((row.updated_at as string) ?? Date.now()).toISOString(),
   };

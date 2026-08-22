@@ -49,12 +49,12 @@ export async function createPractice(focusSkillId?: string | null) {
         channels: [],
         dailyMinutes: 30,
         englishLevel: {},
-        locale: "zh-CN",
+        locale: "en",
         timezone: "Asia/Shanghai",
         updatedAt: new Date().toISOString(),
       } as NonNullable<typeof profile>),
     focusSkillId,
-    locale: profile?.locale ?? "zh-CN",
+    locale: profile?.locale ?? "en",
   });
 
   if (!gen.ok || !gen.data) {
@@ -70,7 +70,7 @@ export async function createPractice(focusSkillId?: string | null) {
     pressureSequence: gen.data.pressureSequence,
     workContextSeed: null,
     openingLine: gen.data.openingLine,
-    locale: profile?.locale ?? "zh-CN",
+    locale: profile?.locale ?? "en",
   });
 
   const openingTurn: RoleplayTurn = {
