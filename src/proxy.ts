@@ -11,7 +11,7 @@ export { auth as proxy } from "@/auth";
 
 export const config = {
   matcher: [
-    // 排除 auth 端点 / 登录页 / 注册页 / 静态资源，其余全走守卫
-    "/((?!api/auth|login|register|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|ico|webp)$).*)",
+    // 排除 auth 端点 / 登录页 / 注册页 / 安装引导 / PWA 资源 / 静态资源，其余全走守卫
+    "/((?!api/auth|login|register|install|manifest.webmanifest|sw.js|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|ico|webp)$).*)",
   ],
 };
